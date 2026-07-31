@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+backend/.venv/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Uploaded PDFs
+backend/uploads/*
+!backend/uploads/.gitkeep
+*.tmp
+*.temp
+
+# Next.js
+node_modules/
+frontend/node_modules/
+.next/
+frontend/.next/
+out/
+dist/
+frontend/.turbo/
+
+# Machine learning artifacts
+ml/saved_models/*
+!ml/saved_models/.gitkeep
+ml/datasets/*
+!ml/datasets/.gitkeep
+*.onnx
+*.pkl
+*.joblib
+*.h5
+*.pt
+*.pth
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
