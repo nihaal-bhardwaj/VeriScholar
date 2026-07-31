@@ -16,7 +16,7 @@ verischolar/
 ├── backend/          FastAPI application (PDF parsing, extraction API)
 ├── frontend/         Next.js + TypeScript + Tailwind application
 ├── ml/               Datasets, notebooks, saved models (future work)
-├── docs/             Scope, API contract, team workflow, architecture
+├── docs/             Scope, API contract, team workflow, architecture, roles
 ├── sample-papers/    Placeholder for permissively licensed sample PDFs
 └── sample-responses/ Example API responses
 ```
@@ -55,6 +55,17 @@ The app runs at `http://localhost:3000`.
 - [ ] ML risk models (future)
 - [ ] Consistency rules and explainable risk report (future)
 - [ ] Fake review detector (future)
+
+## AI-assisted contributor onboarding
+
+1. Pull the latest `main`.
+2. Open the repository in your coding AI (OpenCode, Cline, Claude Code, Gemini CLI, Cursor, Copilot, etc.).
+3. Tell the AI your official project role (e.g. "My role is Frontend & Deployment Engineer").
+4. The AI must read `AGENTS.md` and the matching role playbook in `docs/roles/`.
+5. Current progress lives in `docs/project-status.md`; handoffs in `docs/session-handoff.md`.
+6. Update the status and handoff documents after completing work.
+
+Links: [`AGENTS.md`](AGENTS.md) · [`docs/ai-onboarding.md`](docs/ai-onboarding.md) · [`docs/project-status.md`](docs/project-status.md) · [`docs/session-handoff.md`](docs/session-handoff.md)
 
 ## Team workflow
 
