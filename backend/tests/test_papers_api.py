@@ -21,6 +21,23 @@ def test_extract_endpoint_succeeds_with_valid_pdf(client):
     assert len(body["paper"]["references"]) == 2
 
 
+def test_reference_schema_fields_are_unchanged(client):
+    data = build_pdf("", pages=[SAMPLE_PAPER_PAGE_1, SAMPLE_PAPER_PAGE_2])
+    response = client.post(
+        "/api/v1/papers/extract",
+        files={"file": ("sample.pdf", data, "application/pdf")},
+    )
+
+    assert response.status_code == 200
+    references = response.json()["paper"]["references"]
+    assert references
+    for entry in references:
+        assert set(entry.keys()) == {"number", "raw_text", "doi"}
+        assert isinstance(entry["number"], int)
+        assert isinstance(entry["raw_text"], str) and entry["raw_text"]
+        assert entry["doi"] is None or isinstance(entry["doi"], str)
+
+
 def test_non_pdf_file_is_rejected(client):
     response = client.post(
         "/api/v1/papers/extract",

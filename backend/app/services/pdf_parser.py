@@ -123,15 +123,65 @@ def _detect_references(lines: list[str]) -> str | None:
 
 BRACKETED_REFERENCE = re.compile(r"^\s*\[(\d+)\]\s*(.+)$")
 NUMERAL_REFERENCE = re.compile(r"^\s*(\d{1,4})[.)]\s*(.+)$")
+BARE_NUMBER = re.compile(r"^\s*(\d{1,4})[.)]?\s*$")
+BARE_DIGITS_ONLY = re.compile(r"^\s*(\d{1,4})\s*$")
+
+PAREN_YEAR = re.compile(r"\(\s*((?:1[89]|20)\d{2})[a-z]?\s*\)")
+BARE_YEAR = re.compile(r"\b((?:1[89]|20)\d{2})[a-z]?\b")
+URL_TOKEN = re.compile(r"https?://\S+")
+DOI_TOKEN = re.compile(r"\b10\.\d{4,9}/[^\s.,;:!?)]+")
+AUTHOR_LIKE_START = re.compile(
+    r"^\s*(?:[A-Z\u00C0-\u024F]|"
+    r"(?:van|van der|van den|de|den|der|von|la|le|d')\s+[A-Z\u00C0-\u024F])"
+)
+WRAPPED_YEAR_START = re.compile(r"^\s*\(\s*((?:1[89]|20)\d{2})[a-z]?\s*\)")
+AUTHORISH_LINE_END = re.compile(r"(?:[A-Z\u00C0-\u024F]\.|[,&])\s*$")
+HEADER_FOOTER_START = re.compile(
+    r"^\s*(?:vol\.?|no\.?|pp?\.|page\b|retrieved\b|available\b|accessed\b|cited\b)",
+    re.IGNORECASE,
+)
+
+MAX_NUMBERING_GAP = 3
+YEAR_WINDOW = 120
+MIN_ENTRY_CHARS = 10
+MIN_TINY_FRAGMENT_CHARS = 10
+
+UNRELIABLE_WARNING = (
+    "Reference splitting unreliable: references do not follow a numbered or "
+    "author-year style."
+)
+NUMBERING_GAP_WARNING = (
+    "Reference splitting detected numbering gaps; entries may be incomplete."
+)
+AUTHOR_YEAR_FALLBACK_WARNING = (
+    "Structured references were extracted using conservative author-year fallback."
+)
+LOW_CONFIDENCE_AUTHOR_YEAR_WARNING = (
+    "Author-year splitting produced low-confidence results; references may be incomplete."
+)
+UNASSIGNED_TEXT_WARNING = (
+    "Some reference text could not be assigned to a reference entry."
+)
 
 
 def split_references(references_text: str) -> tuple[list[dict], list[str]]:
-    """Split references text into numbered entries where possible.
+    """Split a references section into structured entries where possible.
 
-    Supports ``[1] text`` and ``1. text`` (or ``1) text``) styles.
-    Returns (entries, warnings). When the style is ambiguous or
-    unreliably detected, returns an empty entry list plus a warning
-    instead of fabricating entries.
+    Supported styles:
+
+    * numbered ``[1] text``, ``1. text`` and ``1) text`` (marker and body on
+      the same line);
+    * numbered with the marker alone on its own line (hanging indent), e.g.
+      ``1.`` / ``1`` followed by the entry body;
+    * conservative author-year bibliographies, e.g. ``Smith, J. (2018). ...``
+      or ``Martín-Martín, A., ... (2018). ...``.
+
+    Returns ``(entries, warnings)``. When no style can be applied reliably,
+    an empty entry list plus a warning is returned instead of fabricated
+    entries. ``number`` carries the printed marker number for numbered
+    styles and the 1-based position for author-year styles. ``doi`` is the
+    first DOI candidate found inside the entry, never the paper's primary
+    DOI.
     """
     if not references_text:
         return [], []
@@ -140,52 +190,231 @@ def split_references(references_text: str) -> tuple[list[dict], list[str]]:
     if not lines:
         return [], []
 
-    style: str | None = None
+    numbered = split_numbered_references(lines)
+    if numbered is not None:
+        return numbered
+
+    author_year = split_author_year_references(lines)
+    if author_year is not None:
+        return author_year
+
+    return [], [UNRELIABLE_WARNING]
+
+
+def detect_numbered_markers(
+    lines: list[str],
+) -> list[tuple[int, int, str | None, str]]:
+    """Return ``(line_index, number, inline_content, style)`` for marker lines.
+
+    ``inline_content`` is the reference text following the marker on the same
+    line, or ``None`` when the marker stands alone (hanging indent).
+    Styles are ``bracket`` (``[1]``) and ``numeral`` (``1.``, ``1)``, bare
+    ``1``).
+    """
+    markers: list[tuple[int, int, str | None, str]] = []
+    for index, line in enumerate(lines):
+        match = BRACKETED_REFERENCE.match(line)
+        if match:
+            markers.append((index, int(match.group(1)), match.group(2), "bracket"))
+            continue
+        match = NUMERAL_REFERENCE.match(line)
+        if match:
+            markers.append((index, int(match.group(1)), match.group(2), "numeral"))
+            continue
+        match = BARE_NUMBER.match(line)
+        if match:
+            markers.append((index, int(match.group(1)), None, "numeral"))
+    return markers
+
+
+def split_numbered_references(
+    lines: list[str],
+) -> tuple[list[dict], list[str]] | None:
+    """Split a numbered references section; ``None`` when not reliably numbered.
+
+    Markers must start at line 0 with number 1 and continue substantially
+    sequentially (small gaps of up to three are tolerated with a warning).
+    Bare digit lines are only treated as markers when they match the exact
+    expected sequence, so stray page numbers are not misread as references.
+    Markers without any body of their own are dropped.
+    """
+    markers = detect_numbered_markers(lines)
+    if len(markers) < 2:
+        return None
+    styles = {style for _, _, _, style in markers}
+    if len(styles) > 1:
+        return None
+
+    # Drop consecutive markers without any content of their own.
+    kept: list[tuple[int, int, str | None]] = []
+    for position, (index, number, content, _style) in enumerate(markers):
+        next_index = markers[position + 1][0] if position + 1 < len(markers) else len(lines)
+        following = lines[index + 1:next_index]
+        has_body = content is not None or any(not BARE_NUMBER.match(line) for line in following)
+        if has_body:
+            kept.append((index, number, content))
+    if not kept:
+        return None
+    if kept[0][0] != 0 or kept[0][1] != 1:
+        return None
+
     entries: list[dict] = []
     current: dict | None = None
-    expected_number = 1
+    expected = 1
+    gaps = 0
+    kept_position = 0
+    unassigned = False
 
-    for line in lines:
-        bracket = BRACKETED_REFERENCE.match(line)
-        numeral = NUMERAL_REFERENCE.match(line)
+    for line_index, line in enumerate(lines):
+        is_marker = kept_position < len(kept) and kept[kept_position][0] == line_index
+        if is_marker:
+            number, content = kept[kept_position][1], kept[kept_position][2]
+            kept_position += 1
+            bare = content is None and BARE_DIGITS_ONLY.match(line) is not None
+            if number == expected or (
+                not bare and expected < number <= expected + MAX_NUMBERING_GAP
+            ):
+                if number != expected:
+                    gaps += 1
+                if current is not None:
+                    entries.append(current)
+                current = {"number": number, "raw_text": content or ""}
+                expected = number + 1
+                continue
+            # Out-of-sequence marker: the line becomes ordinary content below.
 
-        candidate_style = None
-        number: int | None = None
-        content: str | None = None
-        if bracket:
-            candidate_style = "bracket"
-            number = int(bracket.group(1))
-            content = bracket.group(2)
-        elif numeral:
-            candidate_style = "numeral"
-            number = int(numeral.group(1))
-            content = numeral.group(2)
-
-        if candidate_style is not None and number == expected_number and content:
-            if style is None:
-                style = candidate_style
-            if candidate_style != style:
-                return [], ["Reference splitting stopped: mixed numbering styles detected."]
-            if current is not None:
-                entries.append(current)
-            current = {"number": number, "raw_text": content, "doi": None}
-            expected_number += 1
-        elif current is not None:
-            current["raw_text"] += " " + line.strip()
-        else:
-            return [], ["Reference splitting unreliable: references do not follow a numbered style."]
+        if current is None:
+            unassigned = True
+            continue
+        separator = " " if current["raw_text"] else ""
+        current["raw_text"] += separator + line.strip()
 
     if current is not None:
         entries.append(current)
 
-    if not entries:
-        return [], ["Reference splitting unreliable: no numbered entries found."]
+    entries = [entry for entry in entries if len(entry["raw_text"]) >= MIN_ENTRY_CHARS]
+    if not validate_reference_entries(entries):
+        return None
 
+    warnings: list[str] = []
+    if gaps:
+        warnings.append(NUMBERING_GAP_WARNING)
+    if unassigned:
+        warnings.append(UNASSIGNED_TEXT_WARNING)
+    _extract_entry_dois(entries)
+    return entries, warnings
+
+
+def _year_free_head(line: str, limit: int = YEAR_WINDOW) -> str:
+    """First ``limit`` characters of a line with URLs and DOI tokens removed.
+
+    Years embedded in URLs or DOI suffixes (e.g. ``10.1016/J.JOI.2017.06.005``)
+    are artifacts, not publication years, so they must not drive boundary
+    detection.
+    """
+    head = line[:limit]
+    head = URL_TOKEN.sub(" ", head)
+    head = DOI_TOKEN.sub(" ", head)
+    return head
+
+
+def _has_early_year(line: str, limit: int = YEAR_WINDOW) -> bool:
+    """True when a 4-digit year appears early in the line (URL/DOI excluded)."""
+    head = _year_free_head(line, limit)
+    return bool(PAREN_YEAR.search(head) or BARE_YEAR.search(head))
+
+
+def looks_like_author_year_start(line: str) -> bool:
+    """True when a line plausibly starts an author-year reference entry.
+
+    Requires an author-like capitalized start (or a lowercase Dutch/European
+    surname prefix such as ``de Winter``) plus a 4-digit year inside the
+    first ~120 characters after removing URL/DOI tokens. Running-page-header
+    lines such as ``Vol. 9, No. 5; 2013`` are excluded.
+    """
+    if HEADER_FOOTER_START.match(line):
+        return False
+    if not AUTHOR_LIKE_START.match(line):
+        return False
+    return _has_early_year(line)
+
+
+def split_author_year_references(
+    lines: list[str],
+) -> tuple[list[dict], list[str]] | None:
+    """Split an author-year bibliography conservatively.
+
+    A new entry starts at a line matching :func:`looks_like_author_year_start`,
+    or at the line before a wrapped ``(YYYY).`` continuation (author list and
+    year split across lines, e.g. ``Dowle, M., ... Parsonage, H.`` +
+    ``(2018). data.table: ...``). Continuation lines are appended to the
+    current entry until the next confident boundary. Returns ``None`` when
+    the output would be unreliable: fewer than two entries, many tiny
+    fragments, or most entries without a year.
+    """
+    boundaries: list[int] = []
+    for index, line in enumerate(lines):
+        if looks_like_author_year_start(line):
+            boundaries.append(index)
+            continue
+        if (
+            index > 0
+            and WRAPPED_YEAR_START.match(line)
+            and AUTHORISH_LINE_END.search(lines[index - 1])
+        ):
+            boundaries.append(index - 1)
+
+    if not boundaries:
+        return None
+    if boundaries[0] != 0:
+        boundaries.insert(0, 0)
+
+    entries: list[dict] = []
+    for position, start in enumerate(boundaries):
+        end = boundaries[position + 1] if position + 1 < len(boundaries) else len(lines)
+        text = " ".join(line.strip() for line in lines[start:end]).strip()
+        entries.append({"number": position + 1, "raw_text": text})
+
+    if not validate_reference_entries(entries, require_years=True):
+        return None
+
+    _extract_entry_dois(entries)
+    warnings = [AUTHOR_YEAR_FALLBACK_WARNING]
+    with_year = sum(1 for entry in entries if _has_early_year(entry["raw_text"]))
+    tiny = [entry for entry in entries if len(entry["raw_text"]) < MIN_TINY_FRAGMENT_CHARS]
+    if with_year < len(entries) or tiny:
+        warnings.append(LOW_CONFIDENCE_AUTHOR_YEAR_WARNING)
+    return entries, warnings
+
+
+def validate_reference_entries(entries: list[dict], *, require_years: bool = False) -> bool:
+    """Reliability gate shared by numbered and author-year splitting.
+
+    Conservative: entries must carry meaningful text and must not degrade
+    into many tiny fragments. With ``require_years``, most entries must
+    contain a plausible 4-digit year (author-year bibliographies only).
+    """
+    if not entries:
+        return False
+    if len(entries) < (2 if require_years else 1):
+        return False
+    if any(not entry["raw_text"] for entry in entries):
+        return False
+    tiny = [entry for entry in entries if len(entry["raw_text"]) < MIN_TINY_FRAGMENT_CHARS]
+    if len(tiny) > max(1, len(entries) // 5):
+        return False
+    if require_years:
+        with_year = sum(1 for entry in entries if _has_early_year(entry["raw_text"]))
+        if with_year < max(2, int(len(entries) * 0.6)):
+            return False
+    return True
+
+
+def _extract_entry_dois(entries: list[dict]) -> None:
+    """Attach the first DOI candidate of each entry as its ``doi``."""
     for entry in entries:
         candidates = extract_doi_candidates(entry["raw_text"])
         entry["doi"] = candidates[0] if candidates else None
-
-    return entries, []
 
 
 def parse_pdf_bytes(data: bytes, filename: str) -> ExtractedPaper:
