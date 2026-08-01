@@ -1,8 +1,8 @@
-# VeriScholar
+# Mini Project
 
-VeriScholar is a research-integrity screening tool (college mini-project). It analyses uploaded research papers and product reviews for suspicious signals and produces explainable, evidence-backed reports.
+Mini Project is a research-integrity screening tool (college mini-project). It analyses uploaded research papers and product reviews for suspicious signals and produces explainable, evidence-backed reports.
 
-**Important disclaimer:** VeriScholar reports screening signals, not proof of misconduct. The system does not declare a paper "fake" — it surfaces risk indicators (metadata gaps, citation issues, formatting anomalies) so a human can make an informed judgement.
+**Important disclaimer:** Mini Project reports screening signals, not proof of misconduct. The system does not declare a paper "fake" — it surfaces risk indicators (metadata gaps, citation issues, formatting anomalies) so a human can make an informed judgement.
 
 ## Modules
 
@@ -12,7 +12,7 @@ VeriScholar is a research-integrity screening tool (college mini-project). It an
 ## Repository structure
 
 ```text
-verischolar/
+mini-project/
 ├── backend/          FastAPI application (PDF parsing, extraction API)
 ├── frontend/         Next.js + TypeScript + Tailwind application
 ├── ml/               Datasets, notebooks, saved models (future work)
@@ -73,4 +73,4 @@ The team works sequentially on a single `main` branch: one member works at a tim
 
 ## Disclaimer
 
-VeriScholar is an educational project. Its outputs are screening signals that may help detect papers warranting closer inspection. They are not proof of misconduct, plagiarism, or fabrication. Always confirm findings against primary sources before drawing conclusions.
+Mini Project is an educational project. Its outputs are screening signals that may help detect papers warranting closer inspection. They are not proof of misconduct, plagiarism, or fabrication. Always confirm findings against primary sources before drawing conclusions.

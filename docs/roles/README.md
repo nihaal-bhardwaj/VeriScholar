@@ -1,6 +1,6 @@
 # Role Manuals
 
-These documents are permanent role-reference manuals for the VeriScholar team. They define what each member owns, which technologies and official sources to use, what each module must accept and return, and how to verify and hand off work. They are **not** progress trackers, timelines or status reports — current progress lives in `docs/project-status.md` and `docs/session-handoff.md`.
+These documents are permanent role-reference manuals for the Mini Project team. They define what each member owns, which technologies and official sources to use, what each module must accept and return, and how to verify and hand off work. They are **not** progress trackers, timelines or status reports — current progress lives in `docs/project-status.md` and `docs/session-handoff.md`.
 
 ## The four official roles
 

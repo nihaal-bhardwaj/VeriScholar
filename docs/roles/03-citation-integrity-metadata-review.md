@@ -81,7 +81,7 @@ frontend/ → Frontend Engineer
 
 ## 6. Technologies and libraries
 
-| Technology | Purpose in VeriScholar | Required or optional |
+| Technology | Purpose in Mini Project | Required or optional |
 | --- | --- | --- |
 | httpx | External-API calls with timeouts and retries | Required |
 | Pydantic | Typed request/response schemas for all results | Required |
@@ -331,7 +331,7 @@ After meaningful changes, report:
 
 Be able to explain:
 
-- The VeriScholar pipeline position of metadata/citation/consistency checks and why outputs are screening signals requiring human review.
+- The Mini Project pipeline position of metadata/citation/consistency checks and why outputs are screening signals requiring human review.
 - Crossref DOI lookup vs title search and when OpenAlex fallback triggers.
 - DOI normalisation rules and invalid-DOI detection.
 - How title, author, year and venue comparisons work and why field-level evidence matters.

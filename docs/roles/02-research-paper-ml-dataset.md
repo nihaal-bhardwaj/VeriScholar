@@ -81,7 +81,7 @@ frontend/ → Frontend Engineer
 
 ## 6. Technologies and libraries
 
-| Technology | Purpose in VeriScholar | Required or optional |
+| Technology | Purpose in Mini Project | Required or optional |
 | --- | --- | --- |
 | pandas | Dataset loading, cleaning, deduplication, summaries | Required |
 | NumPy | Numeric arrays and evaluation math | Required |
@@ -294,7 +294,7 @@ After meaningful changes, report:
 
 Be able to explain:
 
-- The VeriScholar pipeline and why ML outputs are risk signals, not proof of misconduct.
+- The Mini Project pipeline and why ML outputs are risk signals, not proof of misconduct.
 - Why retracted ≠ fake and how honest-error retractions shape the label definition.
 - Every leakage type handled (splitting, duplicate DOIs, retraction-notice text, journal/year shortcuts) and how the splits avoid them.
 - Why PR-AUC and confusion-matrix review beat raw accuracy on imbalanced data.

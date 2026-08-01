@@ -77,6 +77,46 @@ Project foundation (initial scaffold; no individual role owner)
 
 ---
 
+## 2026-08-01 — Technical Lead, Backend & PDF Processing Engineer
+
+### Role
+Technical Lead, Backend & PDF Processing Engineer (repository-wide coordination)
+
+### Work completed
+- Renamed the project from "VeriScholar" to "Mini Project" across docs, config, backend code and frontend text.
+- Display names updated: `VeriScholar` → `Mini Project`.
+- Service identifier updated: `verischolar-api` → `mini-project-api` (health endpoint, API contract, health test).
+- Logger name updated: `verischolar` → `mini-project` in `backend/app/main.py`.
+- `APP_NAME` updated to `Mini Project API` in `.env.example` and `backend/app/core/config.py`.
+- Frontend page title and metadata updated in `frontend/app/layout.tsx` and `frontend/app/page.tsx`.
+
+### Files changed
+- `README.md`, `AGENTS.md`, `.env.example`
+- `backend/app/main.py`, `backend/app/core/config.py`, `backend/app/api/routes/health.py`, `backend/app/__init__.py`, `backend/app/api/__init__.py`, `backend/tests/__init__.py`, `backend/tests/test_health.py`, `backend/README.md`
+- `frontend/app/layout.tsx`, `frontend/app/page.tsx`, `frontend/README.md`
+- `ml/README.md`
+- `docs/**` (api-contract, project-scope, project-status, ai-onboarding, roles, session-handoff)
+
+### Tests run
+- Backend: `python -m pytest` (planned; health test updated to match new service name)
+- Frontend: no logic changes; text-only
+
+### Current state
+- Name change complete. Historical commit-message quotes (`Set up VeriScholar project foundation`) left verbatim since they reference real Git history.
+- The repository folder on disk is still named `verischolar`; renaming it is left to the team.
+
+### Next recommended task
+- Unchanged from the previous foundation entry per role.
+
+### Dependencies or blockers
+- None.
+
+### Commit / push
+- Commit: none (not requested)
+- Pushed to main: No
+
+---
+
 ## 2026-08-01 — Technical Lead, Backend & PDF Processing Engineer (Phases 6–7)
 
 ### Role

@@ -1,4 +1,4 @@
-# VeriScholar — AGENTS.md
+# Mini Project — AGENTS.md
 
 This file is the universal instruction file for any coding AI working in this repository. Read it fully before doing anything else.
 
@@ -6,7 +6,7 @@ This file is the universal instruction file for any coding AI working in this re
 
 Every AI agent must begin by:
 
-1. Confirming the current working directory is the VeriScholar repository root.
+1. Confirming the current working directory is the Mini Project repository root.
 2. Reading:
    - `AGENTS.md` (this file)
    - `docs/project-status.md`
@@ -48,7 +48,7 @@ Frontend & Deployment
 If no role is stated and it cannot be reliably inferred, ask exactly one concise question:
 
 ```text
-Which VeriScholar role are you working as?
+Which Mini Project role are you working as?
 ```
 
 Then provide the four role options.

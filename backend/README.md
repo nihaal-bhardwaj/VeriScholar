@@ -1,4 +1,4 @@
-# VeriScholar backend
+# Mini Project backend
 
 FastAPI application providing paper-integrity screening APIs.
 

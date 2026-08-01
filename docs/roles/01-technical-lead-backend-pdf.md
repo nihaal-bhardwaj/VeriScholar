@@ -102,7 +102,7 @@ frontend/                 → Frontend Engineer
 
 ## 6. Technologies and libraries
 
-| Technology | Purpose in VeriScholar | Required or optional |
+| Technology | Purpose in Mini Project | Required or optional |
 | --- | --- | --- |
 | FastAPI | Web framework: routing, validation, OpenAPI docs, CORS | Required |
 | Pydantic | Typed schemas and validation of all API inputs/outputs | Required |
@@ -333,7 +333,7 @@ After meaningful changes, report:
 
 Be able to explain:
 
-- The VeriScholar pipeline and why outputs are risk signals, not proof of misconduct.
+- The Mini Project pipeline and why outputs are risk signals, not proof of misconduct.
 - Why heuristic parsing produces warnings instead of fabricated data.
 - DOI regex design, candidate cleanup and best-DOI selection.
 - How abstract and references detection works and when it fails.

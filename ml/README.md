@@ -1,6 +1,6 @@
 # Machine learning work
 
-This directory holds the machine-learning side of VeriScholar. Nothing here is implemented yet.
+This directory holds the machine-learning side of Mini Project. Nothing here is implemented yet.
 
 - `datasets/` — raw and processed datasets. Keep small; never commit large binaries to Git.
 - `notebooks/` — exploratory analysis and prototyping notebooks.

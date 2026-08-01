@@ -97,7 +97,7 @@ docs/roles/ and shared docs → coordinated edits only
 
 ## 6. Technologies and libraries
 
-| Technology | Purpose in VeriScholar | Required or optional |
+| Technology | Purpose in Mini Project | Required or optional |
 | --- | --- | --- |
 | Next.js (App Router) | Application framework: routing, layouts, server/client components, build | Required |
 | React | UI component model and state management | Required |
@@ -324,7 +324,7 @@ After meaningful changes, report:
 
 Be able to explain:
 
-- The VeriScholar pipeline position of the frontend and why outputs are risk signals requiring human review.
+- The Mini Project pipeline position of the frontend and why outputs are risk signals requiring human review.
 - The Next.js App Router structure of the application and why it is organised that way.
 - How the PDF upload interface works: drag-and-drop, file selection and client-side type/size validation.
 - How the processing stages map to the backend modules and how `pending`/`unavailable` states are shown honestly.

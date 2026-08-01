@@ -1,10 +1,10 @@
 # AI-Assisted Onboarding Guide
 
-This guide explains how a VeriScholar team member works with a coding AI (OpenCode, Cline, Claude Code, Gemini CLI, Cursor, Copilot, or similar).
+This guide explains how a Mini Project team member works with a coding AI (OpenCode, Cline, Claude Code, Gemini CLI, Cursor, Copilot, or similar).
 
-## What VeriScholar does
+## What Mini Project does
 
-VeriScholar is a research-integrity screening tool with two modules:
+Mini Project is a research-integrity screening tool with two modules:
 
 1. **Research Paper Integrity Risk Detector (primary)** — screens uploaded PDFs for suspicious signals (DOI/metadata mismatches, unverifiable citations, missing or inconsistent sections, conflicting numbers, suspicious text) and produces explainable risk reports.
 2. **Fake Review Detector (secondary)** — flags likely fake or bot-generated product reviews.

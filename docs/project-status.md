@@ -4,7 +4,7 @@ Living document. Update it at the end of every working session.
 
 ## Project summary
 
-- **Project name:** VeriScholar
+- **Project name:** Mini Project
 - **Primary module:** Research Paper Integrity Risk Detector
 - **Secondary module:** Fake Review Detector
 - **Current stage:** Reference-extraction milestone complete; abstract cleanup is the next module improvement.
@@ -27,7 +27,7 @@ Living document. Update it at the end of every working session.
 ### Frontend
 
 - Next.js 16, TypeScript, Tailwind CSS v4
-- Landing page titled VeriScholar with placeholder navigation (Paper Analyser, Review Detector, Methodology)
+- Landing page titled Mini Project with placeholder navigation (Paper Analyser, Review Detector, Methodology)
 - Lint and production build passing
 - No backend integration yet
 

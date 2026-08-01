@@ -2,7 +2,7 @@
 
 ## Purpose
 
-VeriScholar helps reviewers and students screen research papers for integrity-risk signals. It never declares a paper "fake"; it produces explainable screening reports that a human can act on.
+Mini Project helps reviewers and students screen research papers for integrity-risk signals. It never declares a paper "fake"; it produces explainable screening reports that a human can act on.
 
 ## MVP scope (current)
 
