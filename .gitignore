@@ -21,6 +21,10 @@ backend/uploads/*
 *.tmp
 *.temp
 
+# Local test papers and generated baseline evidence
+local-test-papers/
+local-results/
+
 # Next.js
 node_modules/
 frontend/node_modules/
