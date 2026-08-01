@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "VeriScholar",
+  title: "Mini Project",
   description:
     "Research-integrity screening tool that surfaces suspicious signals in research papers and product reviews.",
 };

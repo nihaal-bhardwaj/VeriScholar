@@ -1,6 +1,6 @@
-# VeriScholar frontend
+# Mini Project frontend
 
-Next.js (App Router) + TypeScript + Tailwind CSS application for the VeriScholar research-integrity screening tool.
+Next.js (App Router) + TypeScript + Tailwind CSS application for the Mini Project research-integrity screening tool.
 
 ## Run
 
@@ -26,7 +26,7 @@ Minimal scaffold: home page with placeholder navigation (Paper Analyser, Review 
 
 ```text
 app/
-├── layout.tsx   root layout and metadata (title: VeriScholar)
+├── layout.tsx   root layout and metadata (title: Mini Project)
 └── page.tsx     home page
 ```
 
