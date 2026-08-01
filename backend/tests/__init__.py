@@ -1,1 +1,1 @@
-"""Test suite for the VeriScholar backend."""
+"""Test suite for the Mini Project backend."""

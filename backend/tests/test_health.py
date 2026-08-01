@@ -8,6 +8,6 @@ def test_health_endpoint_succeeds(client):
     body = response.json()
     assert body == {
         "status": "healthy",
-        "service": "verischolar-api",
+        "service": "mini-project-api",
         "version": "0.1.0",
     }

@@ -9,7 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Runtime configuration for the VeriScholar backend."""
+    """Runtime configuration for the Mini Project backend."""
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -17,7 +17,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    app_name: str = "VeriScholar API"
+    app_name: str = "Mini Project API"
     app_version: str = "0.1.0"
     api_prefix: str = "/api/v1"
     max_upload_size_mb: int = 20

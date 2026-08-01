@@ -14,6 +14,6 @@ def health_check() -> HealthResponse:
     settings = get_settings()
     return HealthResponse(
         status="healthy",
-        service="verischolar-api",
+        service="mini-project-api",
         version=settings.app_version,
     )

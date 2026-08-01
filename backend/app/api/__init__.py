@@ -1,1 +1,1 @@
-"""API layer for the VeriScholar backend."""
+"""API layer for the Mini Project backend."""

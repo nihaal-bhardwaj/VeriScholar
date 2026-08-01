@@ -1,4 +1,4 @@
-"""VeriScholar API entry point.
+"""Mini Project API entry point.
 
 Run from the backend directory with:
     uvicorn app.main:app --reload
@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse
 from app.api.routes import health, papers
 from app.core.config import get_settings
 
-logger = logging.getLogger("verischolar")
+logger = logging.getLogger("mini-project")
 
 settings = get_settings()
 
@@ -22,7 +22,7 @@ app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
     description=(
-        "VeriScholar research-paper integrity screening. "
+        "Mini Project research-paper integrity screening. "
         "Extracts structure from uploaded PDFs and returns explainable "
         "screening signals - never a definitive 'fake paper' verdict."
     ),

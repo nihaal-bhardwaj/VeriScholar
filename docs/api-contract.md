@@ -13,7 +13,7 @@ Health check.
 ```json
 {
   "status": "healthy",
-  "service": "verischolar-api",
+  "service": "mini-project-api",
   "version": "0.1.0"
 }
 ```

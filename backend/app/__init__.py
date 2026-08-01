@@ -1,1 +1,1 @@
-"""VeriScholar backend application package."""
+"""Mini Project backend application package."""
