@@ -59,7 +59,7 @@ git status
 My role is Frontend & Deployment Engineer. Read the project context and tell me the next task.
 ```
 
-The AI reads `AGENTS.md`, `docs/project-status.md`, `docs/api-contract.md`, `docs/team-workflow.md` and `docs/roles/frontend-deployment.md`, then summarises your state and next task.
+The AI reads `AGENTS.md`, `docs/project-status.md`, `docs/api-contract.md`, `docs/team-workflow.md` and `docs/roles/04-frontend-deployment.md`, then summarises your state and next task.
 
 **Example 2 — role stated, continuing work:**
 

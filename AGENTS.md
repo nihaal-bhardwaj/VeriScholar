@@ -63,16 +63,16 @@ After the role is known, read the matching role playbook:
 
 ```text
 Technical Lead, Backend & PDF Processing Engineer
-→ docs/roles/technical-lead-backend-pdf.md
+→ docs/roles/01-technical-lead-backend-pdf.md
 
 Research Paper ML & Dataset Engineer
-→ docs/roles/research-paper-ml.md
+→ docs/roles/02-research-paper-ml-dataset.md
 
 Citation Integrity, Metadata Verification & Fake Review Engineer
-→ docs/roles/citation-integrity-review.md
+→ docs/roles/03-citation-integrity-metadata-review.md
 
 Frontend & Deployment Engineer
-→ docs/roles/frontend-deployment.md
+→ docs/roles/04-frontend-deployment.md
 ```
 
 Then state briefly:
