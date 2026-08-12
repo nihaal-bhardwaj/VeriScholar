@@ -1,9 +1,9 @@
 """PDF parsing service built on PyMuPDF.
 
-Extracts raw text, page-wise text, DOI candidates, abstract and references
-sections from an in-memory PDF byte buffer. The parsing is intentionally
-heuristic and modular: title/author and advanced section detection can be
-added later without touching the route layer.
+Extracts raw text, page-wise text, DOI candidates, title, authors, abstract
+and references sections from an in-memory PDF byte buffer. The parsing is
+intentionally heuristic and modular, so sections can be extended without
+touching the route layer.
 """
 
 from __future__ import annotations
@@ -17,7 +17,21 @@ DOI_PATTERN = re.compile(r"\b10\.\d{4,9}/[-._;()/:A-Z0-9]+\b", re.IGNORECASE)
 DOI_TRAILING_PUNCTUATION = ".,;:!?)]}"
 
 ABSTRACT_HEADINGS = ("abstract", "summary")
-ABSTRACT_STOP_HEADINGS = ("introduction", "keywords", "index terms", "1. introduction", "1 introduction")
+ABSTRACT_STOP_HEADINGS = (
+    "accepted",
+    "citation",
+    "funding",
+    "index terms",
+    "introduction",
+    "keywords",
+    "received",
+    "1. introduction",
+    "1 introduction",
+)
+ABSTRACT_STOP_COLON_PATTERN = re.compile(
+    r"^\s*(?:accepted|citation|funding|index terms|keywords|received)\s*:",
+    re.IGNORECASE,
+)
 
 REFERENCES_HEADINGS = ("references", "bibliography")
 
@@ -46,6 +60,8 @@ class ExtractedPaper:
     doi_candidates: list[str] = field(default_factory=list)
     best_doi: str | None = None
     abstract: str | None = None
+    title: str | None = None
+    authors: list[str] = field(default_factory=list)
     references_text: str | None = None
     references: list[dict] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
@@ -86,16 +102,26 @@ def _lines_with_heading(lines: list[str], headings: tuple[str, ...]) -> list[tup
 
 
 def _section_between(
-    lines: list[str], start_index: int, stop_headings: tuple[str, ...]
+    lines: list[str],
+    start_index: int,
+    stop_headings: tuple[str, ...],
+    stop_colon_pattern: re.Pattern[str] | None = None,
 ) -> str:
     """Join lines from start_index until a stop heading is found.
 
+    Stops at a bare stop heading (optionally ending with a colon, matched
+    case-insensitively and whitespace-tolerantly) or, when
+    ``stop_colon_pattern`` is supplied, at a line headed by a colon-prefixed
+    metadata label such as ``Funding: ...``. Colon labels are matched
+    structurally, so prose such as ``Received wisdom ...`` is never a stop.
     Returns the section text, or ``None`` when nothing usable follows.
     """
     collected: list[str] = []
     for line in lines[start_index + 1 :]:
-        stripped = line.strip().rstrip(":").lower()
-        if stripped in stop_headings:
+        normalized = line.strip().rstrip(":").strip().lower()
+        if normalized in stop_headings:
+            break
+        if stop_colon_pattern is not None and stop_colon_pattern.match(line):
             break
         collected.append(line.strip())
     while collected and not collected[-1]:
@@ -106,7 +132,9 @@ def _section_between(
 def _detect_abstract(lines: list[str]) -> str | None:
     """Find the abstract section between Abstract/Summary and a stop heading."""
     for index, _, _ in _lines_with_heading(lines, ABSTRACT_HEADINGS):
-        section = _section_between(lines, index, ABSTRACT_STOP_HEADINGS)
+        section = _section_between(
+            lines, index, ABSTRACT_STOP_HEADINGS, ABSTRACT_STOP_COLON_PATTERN
+        )
         if section:
             return section
     return None
@@ -119,6 +147,53 @@ def _detect_references(lines: list[str]) -> str | None:
         if section:
             return section
     return None
+
+
+TITLE_MAX_CHARS = 250
+TITLE_MIN_WORDS = 2
+
+TITLE_CONJUNCTIONS = (
+    "a",
+    "an",
+    "and",
+    "for",
+    "from",
+    "in",
+    "into",
+    "of",
+    "on",
+    "the",
+    "to",
+    "under",
+    "using",
+    "via",
+    "with",
+)
+
+EMAIL_TOKEN = re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b")
+
+FRONT_MATTER_METADATA_LABEL = re.compile(
+    r"^\s*(?:accepted|author contributions|available|citation|competing "
+    r"interests|copyright|correspondence|data availability|doi|editor|"
+    r"funding|index terms|keywords|license|licensed|orcid|published|"
+    r"published online|received|retrieved|submitted)\s*:",
+    re.IGNORECASE,
+)
+
+DECORATIVE_TITLE_LINES = (
+    "brief report",
+    "case report",
+    "case study",
+    "corrigendum",
+    "erratum",
+    "letter to the editor",
+    "original article",
+    "original research",
+    "preprint",
+    "research article",
+    "review article",
+    "study protocol",
+)
 
 
 BRACKETED_REFERENCE = re.compile(r"^\s*\[(\d+)\]\s*(.+)$")
@@ -162,6 +237,280 @@ LOW_CONFIDENCE_AUTHOR_YEAR_WARNING = (
 UNASSIGNED_TEXT_WARNING = (
     "Some reference text could not be assigned to a reference entry."
 )
+TITLE_UNCERTAIN_WARNING = (
+    "Title detection uncertain: no reliable title found before the abstract section."
+)
+AUTHOR_UNCERTAIN_WARNING = (
+    "Author detection uncertain: no trustworthy authors could be identified "
+    "in the front matter."
+)
+
+
+def _looks_like_prose(line: str) -> bool:
+    """True when a line reads like running text rather than a title.
+
+    Only lines with enough word tokens (likely a sentence) and a majority
+    of lowercase-initiated words are classified as prose; short title lines
+    are never rejected this way.
+    """
+    words = re.findall(r"[^\W\d_]+", line)
+    if len(words) < 8:
+        return False
+    lowercase_starting = sum(1 for word in words if word[0].islower())
+    return lowercase_starting >= max(3, len(words) // 2)
+
+
+def _is_title_continuation(line: str) -> bool:
+    """True when a line clearly continues the title on the previous line.
+
+    Continuations start with a lowercase word (wrapped titles) or with a
+    quiet title conjunction such as ``and`` / ``with``. Identifier,
+    metadata and decorative lines are never continuations.
+    """
+    stripped = line.strip()
+    if not stripped or len(stripped) > TITLE_MAX_CHARS // 2:
+        return False
+    if not stripped[0].isalpha():
+        return False
+    if FRONT_MATTER_METADATA_LABEL.match(stripped):
+        return False
+    if HEADER_FOOTER_START.match(stripped):
+        return False
+    if stripped.lower() in DECORATIVE_TITLE_LINES:
+        return False
+    if (
+        URL_TOKEN.search(stripped)
+        or DOI_TOKEN.search(stripped)
+        or EMAIL_TOKEN.search(stripped)
+        or "orcid" in stripped.lower()
+    ):
+        return False
+    first = stripped.split()[0]
+    return first[0].islower() or first.lower() in TITLE_CONJUNCTIONS
+
+
+def _is_plausible_title_line(line: str) -> bool:
+    """True when a front-matter line plausibly forms an academic title.
+
+    Conservative by design: rejects metadata labels, decorative article
+    labels, headers/footers, DOI/URL/email/ORCID identifiers, copyright
+    notices, digit-led lines, implausible shapes and implied-prose
+    sentences. Matching text is preserved verbatim.
+    """
+    stripped = line.strip()
+    if not stripped:
+        return False
+    if len(stripped) > TITLE_MAX_CHARS:
+        return False
+    if not (stripped[0].isalpha() and stripped[0].isupper()):
+        return False
+    lowered = stripped.lower()
+    if lowered in DECORATIVE_TITLE_LINES:
+        return False
+    if FRONT_MATTER_METADATA_LABEL.match(stripped):
+        return False
+    if HEADER_FOOTER_START.match(stripped):
+        return False
+    if (
+        URL_TOKEN.search(stripped)
+        or DOI_TOKEN.search(stripped)
+        or EMAIL_TOKEN.search(stripped)
+    ):
+        return False
+    if "orcid" in lowered or "copyright" in lowered or "all rights reserved" in lowered:
+        return False
+    if "\u00a9" in stripped:
+        return False
+    words = [word for word in re.split(r"\s+", stripped) if re.search(r"[^\W\d_]", word)]
+    if len(words) < TITLE_MIN_WORDS:
+        return False
+    return not _looks_like_prose(stripped)
+
+
+def _detect_title(front_matter: list[str]) -> tuple[str | None, list[str]]:
+    """Conservatively infer a paper title from the front matter.
+
+    Prefers the first plausible title line and quietly joins an immediately
+    following line that clearly continues the title (wrapped titles).
+    Never fabricates a title: when nothing reliable is found a hedged
+    warning is returned instead. ``None`` without a warning means the front
+    matter was empty and nothing was claimed at all.
+    """
+    for index, line in enumerate(front_matter):
+        if not _is_plausible_title_line(line):
+            continue
+        parts = [line.strip()]
+        total = len(parts[0])
+        for continuation in front_matter[index + 1 :]:
+            if not _is_title_continuation(continuation):
+                break
+            candidate_total = total + 1 + len(continuation.strip())
+            if candidate_total > TITLE_MAX_CHARS:
+                break
+            parts.append(continuation.strip())
+            total = candidate_total
+            if not continuation[0].islower():
+                break
+        return " ".join(parts), []
+    if not front_matter:
+        return None, []
+    return None, [TITLE_UNCERTAIN_WARNING]
+
+
+AUTHOR_SEPARATOR = re.compile(r"\s+(?:and|&)\s+")
+SUPERSCRIPT_SUFFIX = re.compile(r"\d+(?:,\d+)*$")
+ACRONYM_WORD = re.compile(r"^[A-Z]{3,}$")
+NAME_WORD = re.compile(
+    r"^(?:[A-Z\u00C0-\u024F][\w'\u00C0-\u024F-]*|[A-Z\u00C0-\u024F]\.)$"
+)
+INITIALS_NAME = re.compile(
+    r"^[A-Z\u00C0-\u024F][\w'\u00C0-\u024F-]*,\s*"
+    r"[A-Z\u00C0-\u024F]\.(?:\s*[A-Z\u00C0-\u024F]\.)*"
+    r"(?:\d+(?:,\d+)*)?$"
+)
+AUTHOR_PARTICLES = (
+    "de",
+    "del",
+    "della",
+    "delle",
+    "den",
+    "der",
+    "du",
+    "la",
+    "le",
+    "ten",
+    "ter",
+    "van",
+    "von",
+)
+AFFILIATION_KEYWORDS = re.compile(
+    r"\b(?:academy|association|clinic|college|consortium|council|corporation|"
+    r"department|division|faculty|foundation|group|hospital|incorporated|"
+    r"institute|laborator(?:y|ies)|medical|polytechnic|school|society|unit|"
+    r"university|centre|center)\b",
+    re.IGNORECASE,
+)
+
+
+def _find_title_span(front_matter: list[str]) -> tuple[int, int] | None:
+    """Locate ``(start, end)`` of the title block, mirroring ``_detect_title``."""
+    for index, line in enumerate(front_matter):
+        if not _is_plausible_title_line(line):
+            continue
+        total = len(line.strip())
+        end = index + 1
+        for continuation in front_matter[index + 1:]:
+            if not _is_title_continuation(continuation):
+                break
+            candidate_total = total + 1 + len(continuation.strip())
+            if candidate_total > TITLE_MAX_CHARS:
+                break
+            total = candidate_total
+            end += 1
+            if not continuation[0].islower():
+                break
+        return index, end
+    return None
+
+
+def _is_given_name_token(token: str) -> bool:
+    """True when a token looks like a 2-5 word capitalized human name."""
+    candidate = token[:-1].strip() if token.endswith(".") else token
+    if not candidate:
+        return False
+    words = candidate.split()
+    if not 2 <= len(words) <= 5:
+        return False
+    capitalized = 0
+    has_plain_word = False
+    for word in words:
+        if ACRONYM_WORD.match(word):
+            return False
+        if NAME_WORD.match(word):
+            capitalized += 1
+            if not word.endswith("."):
+                has_plain_word = True
+            continue
+        if word.lower() in AUTHOR_PARTICLES:
+            continue
+        return False
+    return capitalized >= 2 and has_plain_word
+
+
+def _extract_author_pieces(line: str) -> list[str]:
+    """Split a candidate author line into validated name pieces."""
+    pieces: list[str] = []
+    for group in AUTHOR_SEPARATOR.split(line):
+        group = group.strip().rstrip(",")
+        if not group:
+            continue
+        if INITIALS_NAME.match(group):
+            pieces.append(SUPERSCRIPT_SUFFIX.sub("", group).rstrip(" ,"))
+            continue
+        for token in group.split(","):
+            token = token.strip()
+            if not token:
+                continue
+            token = " ".join(SUPERSCRIPT_SUFFIX.sub("", word) for word in token.split())
+            if _is_given_name_token(token):
+                pieces.append(token)
+    return pieces
+
+
+def _detect_authors(front_matter: list[str]) -> tuple[list[str], list[str]]:
+    """Conservatively infer author names from the front matter.
+
+    The author region is anchored on the detected title block (or the whole
+    front matter when no title could be found). Affiliation lines, emails,
+    URLs, DOIs, ORCID identifiers, metadata labels, headers/footers and
+    affiliation-numbered lines are ignored. Names must match either a
+    ``Surname, J. R.`` initials form or a 2-5 word capitalized name; author
+    order is preserved and duplicates are removed case-insensitively. Never
+    fabricates an author: an empty result on a non-empty region yields one
+    hedged warning, while an empty region yields no warning at all.
+    """
+    if not front_matter:
+        return [], []
+    span = _find_title_span(front_matter)
+    region = front_matter[span[1]:] if span else front_matter
+
+    authors: list[str] = []
+    seen: set[str] = set()
+    for line in region:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        lowered = stripped.lower()
+        if (
+            EMAIL_TOKEN.search(stripped)
+            or URL_TOKEN.search(stripped)
+            or DOI_TOKEN.search(stripped)
+            or "orcid" in lowered
+            or "\u00a9" in stripped
+            or "copyright" in lowered
+            or "all rights reserved" in lowered
+        ):
+            continue
+        if FRONT_MATTER_METADATA_LABEL.match(stripped):
+            continue
+        if HEADER_FOOTER_START.match(stripped):
+            continue
+        if not stripped[:1].isalpha():
+            continue
+        affiliation_line = re.sub(r"^\s*\d+[.)]?\s*", "", stripped).strip()
+        if AFFILIATION_KEYWORDS.search(affiliation_line):
+            continue
+        for piece in _extract_author_pieces(stripped):
+            if piece.lower() in seen:
+                continue
+            seen.add(piece.lower())
+            authors.append(piece)
+
+    if authors:
+        return authors, []
+    if not region:
+        return [], []
+    return [], [AUTHOR_UNCERTAIN_WARNING]
 
 
 def split_references(references_text: str) -> tuple[list[dict], list[str]]:
@@ -473,6 +822,16 @@ def parse_pdf_bytes(data: bytes, filename: str) -> ExtractedPaper:
         references, split_warnings = split_references(references_text)
         warnings.extend(split_warnings)
 
+    title = None
+    authors: list[str] = []
+    abstract_matches = _lines_with_heading(lines, ABSTRACT_HEADINGS)
+    if abstract_matches:
+        front_matter = lines[: abstract_matches[0][0]]
+        title, title_warnings = _detect_title(front_matter)
+        warnings.extend(title_warnings)
+        authors, author_warnings = _detect_authors(front_matter)
+        warnings.extend(author_warnings)
+
     if not doi_candidates:
         warnings.append("No DOI candidates found in the document.")
     if not abstract:
@@ -489,6 +848,8 @@ def parse_pdf_bytes(data: bytes, filename: str) -> ExtractedPaper:
         doi_candidates=doi_candidates,
         best_doi=best_doi,
         abstract=abstract,
+        title=title,
+        authors=authors,
         references_text=references_text,
         references=references,
         warnings=warnings,

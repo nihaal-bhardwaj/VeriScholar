@@ -3,13 +3,16 @@
 import pytest
 
 from app.services.pdf_parser import (
+    AUTHOR_UNCERTAIN_WARNING,
     AUTHOR_YEAR_FALLBACK_WARNING,
     LOW_CONFIDENCE_AUTHOR_YEAR_WARNING,
     NUMBERING_GAP_WARNING,
     PDFCorruptError,
     PDFParseError,
     PDFPasswordProtectedError,
+    TITLE_UNCERTAIN_WARNING,
     UNRELIABLE_WARNING,
+    _detect_title,
     extract_doi_candidates,
     parse_pdf_bytes,
     split_references,
@@ -337,3 +340,305 @@ class TestFullParsing:
         document.close()
         with pytest.raises(PDFParseError):
             parse_pdf_bytes(buffer.getvalue(), "blank.pdf")
+
+
+class TestTitleDetection:
+    def test_clean_title_is_extracted(self):
+        page = (
+            "Deep Learning for Iceberg Detection\n"
+            "Abstract\n"
+            "We study convolutional models for iceberg detection.\n"
+        )
+        parsed = parse_pdf_bytes(build_pdf(page), "title.pdf")
+
+        assert parsed.title == "Deep Learning for Iceberg Detection"
+        assert not any("title" in warning.lower() for warning in parsed.warnings)
+
+    def test_metadata_before_title_is_skipped(self):
+        page = (
+            "Research Article\n"
+            "Vol. 9, No. 5\n"
+            "REAL PAPER TITLE\n"
+            "Abstract\n"
+            "Body text here.\n"
+        )
+        parsed = parse_pdf_bytes(build_pdf(page), "metadata-before-title.pdf")
+
+        assert parsed.title == "REAL PAPER TITLE"
+
+    def test_wrapped_title_continuation_is_joined(self):
+        page = (
+            "A Study of Research\n"
+            "integrity in modern science\n"
+            "Abstract\n"
+            "Body text here.\n"
+        )
+        parsed = parse_pdf_bytes(build_pdf(page), "wrapped-title.pdf")
+
+        assert parsed.title == "A Study of Research integrity in modern science"
+
+    def test_metadata_only_front_matter_returns_none_with_warning(self):
+        page = (
+            "Received: 12 March 2020\n"
+            "Accepted: 5 March 2020\n"
+            "Abstract\n"
+            "Body text here.\n"
+        )
+        parsed = parse_pdf_bytes(build_pdf(page), "metadata-only.pdf")
+
+        assert parsed.title is None
+        assert TITLE_UNCERTAIN_WARNING in parsed.warnings
+
+    def test_doi_url_and_email_lines_are_never_titles(self):
+        page = (
+            "https://doi.org/10.1234/example.2026\n"
+            "jane.doe@example.com\n"
+            "DOI: 10.5678/other\n"
+            "Iceberg Detection Survey\n"
+            "Abstract\n"
+            "Body text here.\n"
+        )
+        parsed = parse_pdf_bytes(build_pdf(page), "identifiers.pdf")
+
+        assert parsed.title == "Iceberg Detection Survey"
+
+    def test_unicode_title_text_is_preserved(self):
+        title, warnings = _detect_title(
+            ["Détection Automatique des Icebergs par Imagerie Radar"]
+        )
+
+        assert title == "Détection Automatique des Icebergs par Imagerie Radar"
+        assert warnings == []
+
+    def test_prose_sentence_before_abstract_is_not_a_title(self):
+        page = (
+            "In recent years, deep learning has transformed many areas of research.\n"
+            "Abstract\n"
+            "Body text here.\n"
+        )
+        parsed = parse_pdf_bytes(build_pdf(page), "prose.pdf")
+
+        assert parsed.title is None
+        assert TITLE_UNCERTAIN_WARNING in parsed.warnings
+
+    def test_no_abstract_heading_never_guesses_a_title(self):
+        parsed = parse_pdf_bytes(
+            build_pdf("Just some plain text without sections."), "plain.pdf"
+        )
+
+        assert parsed.title is None
+        assert not any("title" in warning.lower() for warning in parsed.warnings)
+
+    def test_empty_front_matter_returns_none_without_warning(self):
+        parsed = parse_pdf_bytes(build_pdf("Abstract\nBody text here.\n"), "empty-front.pdf")
+
+        assert parsed.title is None
+        assert not any("title" in warning.lower() for warning in parsed.warnings)
+
+
+class TestAuthorExtraction:
+    def test_single_clean_author(self):
+        page = (
+            "Iceberg Radar Survey\n"
+            "John Doe\n"
+            "Abstract\n"
+            "Body text here.\n"
+        )
+        parsed = parse_pdf_bytes(build_pdf(page), "single-author.pdf")
+
+        assert parsed.authors == ["John Doe"]
+        assert not any("author" in warning.lower() for warning in parsed.warnings)
+
+    def test_comma_separated_authors(self):
+        page = (
+            "Iceberg Radar Survey\n"
+            "John Doe, Jane Smith\n"
+            "Abstract\n"
+            "Body text here.\n"
+        )
+        parsed = parse_pdf_bytes(build_pdf(page), "comma-authors.pdf")
+
+        assert parsed.authors == ["John Doe", "Jane Smith"]
+
+    def test_and_separated_authors(self):
+        page = (
+            "Iceberg Radar Survey\n"
+            "John Doe and Jane Smith\n"
+            "Abstract\n"
+            "Body text here.\n"
+        )
+        parsed = parse_pdf_bytes(build_pdf(page), "and-authors.pdf")
+
+        assert parsed.authors == ["John Doe", "Jane Smith"]
+
+    def test_ampersand_separated_authors(self):
+        page = (
+            "Iceberg Radar Survey\n"
+            "John Doe & Jane Smith\n"
+            "Abstract\n"
+            "Body text here.\n"
+        )
+        parsed = parse_pdf_bytes(build_pdf(page), "ampersand-authors.pdf")
+
+        assert parsed.authors == ["John Doe", "Jane Smith"]
+
+    def test_authors_across_multiple_lines(self):
+        page = (
+            "Iceberg Radar Survey\n"
+            "John Doe\n"
+            "Jane Smith\n"
+            "Abstract\n"
+            "Body text here.\n"
+        )
+        parsed = parse_pdf_bytes(build_pdf(page), "multi-line-authors.pdf")
+
+        assert parsed.authors == ["John Doe", "Jane Smith"]
+
+    def test_surname_initials_form(self):
+        page = (
+            "Iceberg Radar Survey\n"
+            "Doe, J. R.\n"
+            "Abstract\n"
+            "Body text here.\n"
+        )
+        parsed = parse_pdf_bytes(build_pdf(page), "initials-author.pdf")
+
+        assert parsed.authors == ["Doe, J. R."]
+
+    def test_affiliations_and_identifiers_ignored(self):
+        page = (
+            "Iceberg Radar Survey\n"
+            "John Doe\n"
+            "jane.doe@example.com\n"
+            "https://orcid.org/0000-0001-2345-6789\n"
+            "10.1234/example\n"
+            "1 Department of Neurology, University of Berlin\n"
+            "2 Center for Artificial Intelligence, MIT\n"
+            "Received: 12 March 2020\n"
+            "Abstract\n"
+            "Body text here.\n"
+        )
+        parsed = parse_pdf_bytes(build_pdf(page), "affiliations.pdf")
+
+        assert parsed.authors == ["John Doe"]
+        assert not any("author" in warning.lower() for warning in parsed.warnings)
+
+    def test_superscript_markers_stripped(self):
+        page = (
+            "Iceberg Radar Survey\n"
+            "John Doe1,2 and Jane Smith1\n"
+            "Abstract\n"
+            "Body text here.\n"
+        )
+        parsed = parse_pdf_bytes(build_pdf(page), "superscripts.pdf")
+
+        assert parsed.authors == ["John Doe", "Jane Smith"]
+
+    def test_superscript_marker_on_initials_form(self):
+        page = (
+            "Iceberg Radar Survey\n"
+            "Doe, J. R.1\n"
+            "Abstract\n"
+            "Body text here.\n"
+        )
+        parsed = parse_pdf_bytes(build_pdf(page), "initials-superscript.pdf")
+
+        assert parsed.authors == ["Doe, J. R."]
+
+    def test_ambiguous_author_region_returns_empty_with_warning(self):
+        page = (
+            "Iceberg Radar Survey\n"
+            "Funding: National Science Foundation\n"
+            "Vol. 9, No. 5; 2026\n"
+            "Abstract\n"
+            "Body text here.\n"
+        )
+        parsed = parse_pdf_bytes(build_pdf(page), "ambiguous-authors.pdf")
+
+        assert parsed.authors == []
+        assert AUTHOR_UNCERTAIN_WARNING in parsed.warnings
+
+    def test_no_author_region_returns_empty_without_warning(self):
+        parsed = parse_pdf_bytes(build_pdf("Abstract\nBody text here.\n"), "no-authors.pdf")
+
+        assert parsed.authors == []
+        assert AUTHOR_UNCERTAIN_WARNING not in parsed.warnings
+
+    def test_title_only_front_matter_has_no_author_region(self):
+        page = (
+            "Iceberg Radar Survey\n"
+            "Abstract\n"
+            "Body text here.\n"
+        )
+        parsed = parse_pdf_bytes(build_pdf(page), "title-only.pdf")
+
+        assert parsed.authors == []
+        assert AUTHOR_UNCERTAIN_WARNING not in parsed.warnings
+
+    def test_order_is_preserved_and_duplicates_removed_case_insensitively(self):
+        page = (
+            "Iceberg Radar Survey\n"
+            "John Doe\n"
+            "Jane Smith\n"
+            "John van Doorn\n"
+            "John Van Doorn\n"
+            "Abstract\n"
+            "Body text here.\n"
+        )
+        parsed = parse_pdf_bytes(build_pdf(page), "order-dedupe.pdf")
+
+        assert parsed.authors == ["John Doe", "Jane Smith", "John van Doorn"]
+
+
+class TestAbstractBoundaryCleanup:
+    STOP_LABELS = [
+        ("Keywords", "iceberg, radar, remote sensing"),
+        ("Index Terms", "neural networks, deep learning"),
+        ("Funding", "National Science Foundation"),
+        ("Citation", "Doe J, Smith J. 2026"),
+        ("Received", "12 March 2020"),
+        ("Accepted", "5 April 2020"),
+    ]
+
+    def _parse_with_header(self, header: str) -> object:
+        page = (
+            "Abstract\n"
+            "We study radar imagery for iceberg detection.\n"
+            f"{header}\n"
+            "1. Introduction\n"
+            "Body text here.\n"
+        )
+        return parse_pdf_bytes(build_pdf(page), "abstract-boundary.pdf")
+
+    @pytest.mark.parametrize("label,value", STOP_LABELS)
+    def test_colon_label_stops_abstract(self, label, value):
+        parsed = self._parse_with_header(f"{label}: {value}")
+
+        assert parsed.abstract == "We study radar imagery for iceberg detection."
+
+    @pytest.mark.parametrize("label", [case[0] for case in STOP_LABELS])
+    def test_bare_heading_stops_abstract(self, label):
+        parsed = self._parse_with_header(label)
+
+        assert parsed.abstract == "We study radar imagery for iceberg detection."
+
+    def test_whitespace_tolerant_colon_stops_abstract(self):
+        parsed = self._parse_with_header("Funding  :  National Science Foundation")
+
+        assert parsed.abstract == "We study radar imagery for iceberg detection."
+
+    def test_case_insensitive_label_stops_abstract(self):
+        parsed = self._parse_with_header("keywords: iceberg, radar, remote sensing")
+
+        assert parsed.abstract == "We study radar imagery for iceberg detection."
+
+    def test_received_wisdom_prose_does_not_stop_abstract(self):
+        page = (
+            "Abstract\n"
+            "Received wisdom suggests that icebergs drift slowly.\n"
+            "1. Introduction\n"
+            "Body text here.\n"
+        )
+        parsed = parse_pdf_bytes(build_pdf(page), "received-wisdom.pdf")
+
+        assert parsed.abstract == "Received wisdom suggests that icebergs drift slowly."

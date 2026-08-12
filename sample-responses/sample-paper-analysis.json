@@ -8,6 +8,8 @@
     "doi": "10.1234/example",
     "doi_candidates": ["10.1234/example"],
     "abstract": "Extracted abstract text",
+    "title": "Deep Learning for Iceberg Detection",
+    "authors": ["Jane P. Doe", "John A. Smith"],
     "references_text": "Full extracted references section",
     "references": [
       {

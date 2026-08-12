@@ -182,3 +182,52 @@ cd ..
 git status --short
 git diff --stat
 ```
+
+---
+
+## 2026-08-12 — Technical Lead, Backend & PDF Processing Engineer (Phase 1)
+
+### Role
+Technical Lead, Backend & PDF Processing Engineer
+
+### Work completed
+- Phase 1 mini-phases, executed in isolated sub-phases and now fully verified:
+  - **Title extraction:** conservative `_detect_title` on front matter before the Abstract/Summary heading; first plausible title line plus wrapped-title continuation; rejects metadata/decorative labels, headers/footers, DOI/URL/email/ORCID/copyright tokens, digit-led and prose lines; `null` + `TITLE_UNCERTAIN_WARNING` when uncertain, no warning for empty front matter. (9 new tests)
+  - **Author extraction:** `_detect_authors` anchored on the title block; supports single/comma/`and`/`&`/multi-line/`Doe, J. R.` forms; strips superscripts (`Doe1,2`); ignores emails, URLs, DOIs, ORCID, affiliation-numbered lines, departments/universities/institutes/hospitals/labs; order preserved, case-insensitive dedupe; `[]` never fabrication; `AUTHOR_UNCERTAIN_WARNING` only for a non-empty unparseable region. (13 new tests)
+  - **Abstract boundary cleanup:** abstract stops at bare headings and colon-prefixed labels `Keywords`/`Index Terms`/`Funding`/`Citation`/`Received`/`Accepted`; case-insensitive, whitespace-tolerant, colon-aware; structural matching so `Received wisdom suggests...` prose never truncates the abstract; references path unchanged (`stop_colon_pattern` default). (15 new tests)
+  - **Schema + API + tests:** `PaperExtraction` exposes additive `title: str | None = None` and `authors: list[str] = Field(default_factory=list)`; `extract_paper` maps `parsed.title` / `parsed.authors` end to end; end-to-end API tests assert response values equal parser output. (3 new API tests)
+  - **Docs + samples:** `docs/api-contract.md` and `sample-responses/sample-paper-analysis.json` updated with `title`/`authors`; `docs/project-status.md` and `docs/session-handoff.md` logged.
+- No new dependencies; warn-not-fabricate behaviour preserved; no OCR/plagiarism/scoring work.
+
+### Files changed
+- `backend/app/services/pdf_parser.py` — title, authors, abstract boundary cleanup
+- `backend/app/schemas/paper.py` — `title`/`authors` fields
+- `backend/app/api/routes/papers.py` — field mapping
+- `backend/tests/test_pdf_parser.py`, `backend/tests/test_papers_api.py` — tests (46 → 86)
+- `docs/api-contract.md`, `docs/project-status.md`, `docs/session-handoff.md`
+- `sample-responses/sample-paper-analysis.json`
+
+### Tests run
+- Backend: `.\backend\.venv\Scripts\python.exe -m pytest -q` → **86 passed** (1 pre-existing StarletteDeprecationWarning)
+- Compile: `.\backend\.venv\Scripts\python.exe -m compileall -q app tests` → clean
+- `git diff --check` → clean
+
+### Current state
+- Branch: `main`; base commit: `36cb002` (unchanged — Phase-1 work uncommitted)
+- Phase-1 implementation, tests and documentation all present in the working tree; nothing staged, committed or pushed
+- `docs/api-contract.md` and the sample response now match the schema
+
+### Known limitations
+- Title/authors anchored only when an `Abstract`/`Summary` heading exists
+- `Received`/`Accepted`/etc. bare headings are exact-line matches; a same-line affiliation with an author name drops the whole line conservatively
+- No keywords/index-terms or section-heading extraction yet; no page-number evidence tracking; two-column layouts not layout-aware; no OCR
+
+### Next recommended task
+- Keywords / index-terms extraction with regression tests, then section-heading detection and page-number/evidence tracking.
+
+### Dependencies or blockers
+- None. Phase-1 work is uncommitted; the team should coordinate commit/push of the whole Phase-1 set together (main-only workflow).
+
+### Commit / push
+- Commit: none (not requested)
+- Pushed to main: No

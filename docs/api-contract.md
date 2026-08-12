@@ -45,6 +45,8 @@ Response:
     "doi": "10.1234/example",
     "doi_candidates": ["10.1234/example"],
     "abstract": "Extracted abstract text",
+    "title": "Deep Learning for Iceberg Detection",
+    "authors": ["Jane P. Doe", "John A. Smith"],
     "references_text": "Full extracted references section",
     "references": [
       {
@@ -65,6 +67,8 @@ Response:
 ```
 
 `analysis_id` is a UUID v4 generated per request. Warnings describe signals the parser detected (e.g. missing abstract, unreliable reference splitting) — never a fake-paper verdict.
+
+`title` is the conservatively detected paper title (`null` when the parser is uncertain or no abstract heading exists to anchor front matter). `authors` is the ordered, deduplicated list of detected author names; it is `[]` when no trustworthy names could be identified, never fabricated.
 
 ## Future combined analysis contract
 

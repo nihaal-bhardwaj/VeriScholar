@@ -102,6 +102,8 @@ def extract_paper(file: UploadFile | None = File(default=None)) -> ExtractionRes
         doi=parsed.best_doi,
         doi_candidates=parsed.doi_candidates,
         abstract=parsed.abstract,
+        title=parsed.title,
+        authors=parsed.authors,
         references_text=parsed.references_text,
         references=parsed.references,
         pages=parsed.pages,

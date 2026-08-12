@@ -29,6 +29,8 @@ class PaperExtraction(BaseModel):
     doi: str | None = None
     doi_candidates: list[str] = Field(default_factory=list)
     abstract: str | None = None
+    title: str | None = None
+    authors: list[str] = Field(default_factory=list)
     references_text: str | None = None
     references: list[ReferenceEntry] = Field(default_factory=list)
     pages: list[PageText] = Field(default_factory=list)

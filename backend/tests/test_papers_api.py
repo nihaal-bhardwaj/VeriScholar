@@ -1,6 +1,7 @@
 """Tests for the paper extraction endpoint."""
 
 from app.core.config import get_settings
+from app.services.pdf_parser import parse_pdf_bytes
 from tests.conftest import SAMPLE_PAPER_PAGE_1, SAMPLE_PAPER_PAGE_2, build_pdf
 
 
@@ -36,6 +37,57 @@ def test_reference_schema_fields_are_unchanged(client):
         assert isinstance(entry["number"], int)
         assert isinstance(entry["raw_text"], str) and entry["raw_text"]
         assert entry["doi"] is None or isinstance(entry["doi"], str)
+
+
+def test_title_and_authors_are_exposed_in_response(client):
+    page_1 = (
+        "Iceberg Radar Survey\n"
+        "John Doe, Jane Smith\n"
+        "Abstract\n"
+        "We study radar imagery for iceberg detection.\n"
+        "Keywords: iceberg, radar\n"
+        "1. Introduction\n"
+        "Body text here.\n"
+    )
+    page_2 = "2. Method\nMore content here.\n"
+    data = build_pdf("", pages=[page_1, page_2])
+
+    response = client.post(
+        "/api/v1/papers/extract",
+        files={"file": ("titled.pdf", data, "application/pdf")},
+    )
+
+    assert response.status_code == 200
+    paper = response.json()["paper"]
+    parsed = parse_pdf_bytes(data, "titled.pdf")
+    assert paper["title"] == parsed.title == "Iceberg Radar Survey"
+    assert paper["authors"] == parsed.authors == ["John Doe", "Jane Smith"]
+
+
+def test_sample_paper_title_and_authors_flow_through_response(client):
+    data = build_pdf("", pages=[SAMPLE_PAPER_PAGE_1, SAMPLE_PAPER_PAGE_2])
+    response = client.post(
+        "/api/v1/papers/extract",
+        files={"file": ("sample.pdf", data, "application/pdf")},
+    )
+
+    assert response.status_code == 200
+    paper = response.json()["paper"]
+    assert paper["title"] == "Deep Learning for Iceberg Detection"
+    assert paper["authors"] == []
+
+
+def test_default_title_and_authors_when_front_matter_empty(client):
+    data = build_pdf("Abstract\nBody text here.\n")
+    response = client.post(
+        "/api/v1/papers/extract",
+        files={"file": ("plain.pdf", data, "application/pdf")},
+    )
+
+    assert response.status_code == 200
+    paper = response.json()["paper"]
+    assert paper["title"] is None
+    assert paper["authors"] == []
 
 
 def test_non_pdf_file_is_rejected(client):
