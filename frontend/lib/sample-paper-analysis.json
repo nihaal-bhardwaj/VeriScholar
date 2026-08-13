@@ -1,0 +1,27 @@
+{
+  "analysis_id": "generated-uuid",
+  "status": "completed",
+  "paper": {
+    "filename": "example.pdf",
+    "file_size_bytes": 123456,
+    "page_count": 8,
+    "doi": "10.1234/example",
+    "doi_candidates": ["10.1234/example"],
+    "abstract": "Extracted abstract text",
+    "references_text": "Full extracted references section",
+    "references": [
+      {
+        "number": 1,
+        "raw_text": "First reference text",
+        "doi": null
+      }
+    ],
+    "pages": [
+      {
+        "page_number": 1,
+        "text": "Page content"
+      }
+    ]
+  },
+  "warnings": []
+}

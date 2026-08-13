@@ -180,8 +180,90 @@ cd backend
 .\.venv\Scripts\python.exe -m pytest -q
 cd ..
 git status --short
-git diff --stat
 ```
+
+---
+
+## 2026-08-08 — Frontend & Deployment Engineer
+
+### Role
+Frontend & Deployment Engineer
+
+### Work completed
+- Built the PDF upload and mock report flow (`/analyser` route).
+- Added drag-and-drop `PDFUploader` component with client-side file size (<10MB) and type validation.
+- Built `AnalysisProgress` UI to simulate backend stage progression.
+- Built `ReportDashboard` to render the `sample-responses/sample-paper-analysis.json` data.
+- Handled empty, error, and partial-result states visually.
+- Added strict type interfaces matching `docs/api-contract.md`.
+- Added a `mock-api.ts` file that uses the sample JSON response and simulates processing delay.
+- Ensured mandatory "human review" disclaimers are visible on the dashboard.
+
+### Files changed
+- `docs/project-status.md`
+- `frontend/app/page.tsx`
+- `frontend/app/analyser/page.tsx` (NEW)
+- `frontend/components/upload/PDFUploader.tsx` (NEW)
+- `frontend/components/progress/AnalysisProgress.tsx` (NEW)
+- `frontend/components/report/ReportDashboard.tsx` (NEW)
+- `frontend/lib/api-types.ts` (NEW)
+- `frontend/lib/mock-api.ts` (NEW)
+- `frontend/lib/sample-paper-analysis.json` (NEW)
+
+### Tests run
+- `npm run lint` — Pass
+- `npm run build` — Pass
+
+### Current state
+- The frontend `/analyser` route provides a working mock flow from upload to report display.
+- Latest base commit: `a1fa308`
+
+### Next recommended task
+- Integrate the real extraction endpoint using an environment-based backend URL and coordinate CORS with the Technical Lead.
+
+### Dependencies or blockers
+- Needs the live backend URL environment variables and CORS headers to be opened on the FastAPI side.
+
+### Commit / push
+- Commit: None
+- Pushed to main: No
+
+---
+
+## 2026-08-08 — Frontend & Deployment Engineer (API Integration)
+
+### Role
+Frontend & Deployment Engineer
+
+### Work completed
+- Configured `.env.local` to point to the FastAPI backend (`NEXT_PUBLIC_API_URL`).
+- Replaced the `mock-api.ts` file with a real `api.ts` client that uses `fetch` and `FormData` to POST PDFs.
+- Confirmed CORS is correctly set up in the backend `config.py` for `http://localhost:3000`.
+- Merged the real backend extraction result with placeholder blocks for pending ML/Citation modules so the UI remains stable.
+- Updated `app/analyser/page.tsx` to use the real API client.
+
+### Files changed
+- `frontend/.env.local` (NEW)
+- `frontend/lib/api.ts` (NEW)
+- `frontend/app/analyser/page.tsx`
+- `docs/project-status.md`
+
+### Tests run
+- `npm run lint` — Pass
+- `npm run build` — Pass
+
+### Current state
+- The frontend `/analyser` route successfully communicates with the live backend for PDF extraction.
+
+### Next recommended task
+- The Technical Lead or Citation Integrity Engineer should build the next backend module, as the frontend is now fully wired up for the MVP extraction.
+
+### Dependencies or blockers
+- None.
+
+### Commit / push
+- Commit: Frontend API Integration and UI Components
+- Pushed to main: Yes
 
 ---
 

@@ -1,6 +1,6 @@
 export default function Home() {
   const navItems = [
-    { label: "Paper Analyser", href: "#" },
+    { label: "Paper Analyser", href: "/analyser" },
     { label: "Review Detector", href: "#" },
     { label: "Methodology", href: "#" },
   ];
@@ -30,8 +30,7 @@ export default function Home() {
           evidence-backed risk reports.
         </p>
         <p className="max-w-xl text-sm text-zinc-500 dark:text-zinc-500">
-          Placeholder home page. The Paper Analyser, Review Detector and
-          Methodology sections are under construction.
+          The Review Detector and Methodology sections are under construction.
         </p>
       </main>
 
