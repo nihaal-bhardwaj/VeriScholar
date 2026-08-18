@@ -77,6 +77,18 @@ Living document. Update it at the end of every working session.
 - Tests: 13 new in `backend/tests/test_consistency_checker.py`; full backend suite 110/110 passing
 - No new dependency; no existing tests modified; warnings never reduce evidence quality and flags never claim fraud
 
+## Report generator milestone (Technical Lead)
+
+- Final combiner `backend/app/services/report_generator.py`:
+  - `ReportInput` accepts optional `ConsistencyReport`, citation/metadata/ML placeholders (`None` allowed)
+  - `RiskReport` output: `risk_score` (0–100, high=15 / medium=8 / low=3 points, capped), `risk_level` (low/medium/high/critical thresholds 25/50/75), `confidence` (0.0 with no modules; capped 0.6 when only consistency runs), template `summary`, `signals` with weights, `passed_checks`, `modules_used`, `generated_at`
+- New schemas in `backend/app/schemas/report.py`: `ReportInput`, `RiskSignal`, `RiskReport`
+- New endpoints wired in `main.py`:
+  - `POST /api/v1/report/generate` — combine module outputs into `RiskReport`
+  - `POST /api/v1/analyze/full` — all-in-one PDF upload → extraction → consistency → `RiskReport`
+- Tests: 16 new in `backend/tests/test_report_generator.py`; full backend suite 126/126 passing
+- `docs/api-contract.md` updated with both endpoints; no new dependency; existing tests untouched
+
 ## Current overall milestone
 
 ```text
@@ -87,7 +99,7 @@ Phase 1 complete: title, authors, abstract boundary cleanup, and schema/API inte
 
 | Role | Completed | Current priority | Next deliverable | Dependencies | Known blockers |
 | --- | --- | --- | --- | --- | --- |
-| Technical Lead, Backend & PDF Processing Engineer | FastAPI app, health + extract endpoints, parser, tests, API contract; five-paper baseline, ground truth and parser comparison; structured reference extraction (numbered, hanging markers, conservative author-year, per-entry DOI); Phase 1: conservative title extraction, conservative author extraction, abstract boundary cleanup, schema/API integration of `title` + `authors` (86 tests) | Extract keywords/index terms; section-heading detection; page-number/evidence tracking | Keywords and index-terms extraction with regression tests | None (parser runs standalone); Phase-1 work uncommitted and awaiting team commit/push | None |
+| Technical Lead, Backend & PDF Processing Engineer | FastAPI app, health + extract endpoints, parser, tests, API contract; five-paper baseline, ground truth and parser comparison; structured reference extraction (numbered, hanging markers, conservative author-year, per-entry DOI); Phase 1: conservative title extraction, conservative author extraction, abstract boundary cleanup, schema/API integration of `title` + `authors` (86 tests); report generator: `RiskReport` combiner with scoring/levels/confidence, `POST /report/generate` and `POST /analyze/full` endpoints (16 tests, 126/126 suite green) | Extract keywords/index terms; section-heading detection; page-number/evidence tracking | Keywords and index-terms extraction with regression tests | None (parser runs standalone); Phase-1 work uncommitted and awaiting team commit/push | None |
 | Research Paper ML & Dataset Engineer | Directory skeleton (`ml/`), no code yet | Finalise labels; create an initial dataset pipeline; build a TF-IDF Logistic Regression baseline | A reproducible baseline notebook with dataset summary and evaluation metrics | Extraction schema from Technical Lead for features | None |
 | Citation Integrity, Metadata Verification & Fake Review Engineer | Local consistency rules engine (5 rules: date, figure, author, section, reference-number continuity), typed `ConsistencyReport` schema, `POST /api/v1/integrity/check` endpoint, 13 tests (110/110 backend green) | Build Crossref DOI lookup with mocked tests | A metadata-verification service that returns matched fields, mismatches, confidence and warnings | Extracted DOI/title/author fields from parser (available) | None |
 | Frontend & Deployment Engineer | Next.js scaffold; PDF upload flow; mock analysis-progress UI; real backend API integration (fetch, FormData, CORS) | Build the remaining real-time progress indicators once WebSocket/SSE is added, or wait for next module | A complete frontend flow using the live FastAPI backend | Stable API contract | None |

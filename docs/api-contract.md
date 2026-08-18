@@ -123,6 +123,72 @@ Response — the typed `ConsistencyReport`:
 
 Rules currently implemented: `date_consistency`, `figure_reference_consistency`, `author_name_consistency`, `section_structure_consistency`, `reference_number_continuity`.
 
+### `POST /report/generate`
+
+Combines outputs from all analysis modules into one unified risk report. Citation, metadata and ML modules are optional placeholders for now — they may be `null` and the generator still works. The report is an explainable screening signal for human review, never a fake-paper verdict.
+
+Request body (`ReportInput`):
+
+```json
+{
+  "analysis_id": "generated-uuid",
+  "paper_title": "Deep Learning for Iceberg Detection",
+  "paper_authors": ["Jane P. Doe", "John A. Smith"],
+  "abstract": "Extracted abstract text",
+  "keywords": ["deep learning", "iceberg detection"],
+  "consistency_report": {
+    "flags": [],
+    "warnings": [],
+    "passed_checks": [],
+    "consistency_score": 1.0
+  },
+  "citation_results": null,
+  "metadata_results": null,
+  "ml_results": null
+}
+```
+
+Response — the typed `RiskReport`:
+
+```json
+{
+  "analysis_id": "generated-uuid",
+  "paper_title": "Deep Learning for Iceberg Detection",
+  "paper_authors": ["Jane P. Doe", "John A. Smith"],
+  "risk_score": 15.0,
+  "risk_level": "low",
+  "confidence": 0.4,
+  "summary": "Minor inconsistencies were detected. Human review is recommended but risk is low.",
+  "signals": [
+    {
+      "source": "consistency",
+      "severity": "medium",
+      "message": "Figure 3 is referenced in text but never defined",
+      "evidence": "Results are shown in Figure 3 below.",
+      "weight": 0.5333
+    }
+  ],
+  "passed_checks": ["date_consistency: all cited reference years are on or before the paper's publication year"],
+  "modules_used": ["consistency"],
+  "generated_at": "2026-08-18T12:00:00Z"
+}
+```
+
+Scoring rules:
+
+- Each `ConsistencyFlag` with severity `high` adds 15 points, `medium` adds 8, `low` adds 3; capped at 100.0.
+- Risk level thresholds: `0-25` low, `26-50` medium, `51-75` high, `76-100` critical.
+- Confidence: `0.0` when no modules ran; capped at `0.6` when only the consistency module contributed.
+- `signal.weight` is the share of the maximum per-signal score (high = 1.0, medium ≈ 0.5333, low = 0.2).
+
+### `POST /analyze/full`
+
+All-in-one endpoint: uploads a PDF, runs extraction, runs the consistency rules and generates the `RiskReport` in a single request. The frontend calls this for the complete analysis.
+
+Request: one PDF via multipart form data (field name `file`), same validations as `/papers/extract` (400 missing/empty, 415 non-PDF, 413 oversized, 422 unusable PDF).
+
+Response: `RiskReport` (same shape as `/report/generate`). `modules_used` currently contains only `"consistency"` until the citation/metadata/ML modules are built.
+
 ## Future combined analysis contract
 
 All future team modules **must** follow this shared response shape. Each sub-analysis reports its own status; unimplemented modules return `"pending"` with `null` values, never fabricated numbers.

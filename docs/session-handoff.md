@@ -360,3 +360,49 @@ Citation Integrity, Metadata Verification & Fake Review Engineer
 ### Commit / push
 - Commit: none (not requested; also blocked by missing `.git`)
 - Pushed to main: No
+
+---
+
+## 2026-08-18 — Technical Lead, Backend & PDF Processing Engineer (Report Generator)
+
+### Role
+Technical Lead, Backend & PDF Processing Engineer (orchestrator work)
+
+### Work completed
+- Built the final combiner `backend/app/services/report_generator.py`:
+  - `generate_report(ReportInput) -> RiskReport`; citation/metadata/ML module outputs are optional placeholders (`None` allowed)
+  - Scoring: high flag = 15 points, medium = 8, low = 3, capped at 100.0
+  - Risk levels: 0–25 low, 26–50 medium, 51–75 high, 76–100 critical
+  - Confidence: 0.0 with no modules; base 0.4 plus 0.15 per extra module, capped at 0.95; capped at 0.6 when only the consistency module contributes
+  - Template summaries per score/level; `signals` carry source/severity/message/evidence/weight; `passed_checks`, `modules_used`, `generated_at` (UTC)
+- New schemas `backend/app/schemas/report.py`: `ReportInput`, `RiskSignal`, `RiskReport` (reuses `ConsistencyReport`).
+- New endpoints in `backend/app/api/routes/report.py`, wired into `main.py`:
+  - `POST /api/v1/report/generate` — combines module outputs into a `RiskReport`
+  - `POST /api/v1/analyze/full` — all-in-one: PDF upload → extraction → consistency rules → `RiskReport` (same upload validation as `/papers/extract`, reusing its helpers)
+- 16 new tests; full backend suite 126/126 passing; no new dependency; existing tests untouched.
+
+### Files changed
+- `backend/app/services/report_generator.py` (NEW)
+- `backend/app/schemas/report.py` (NEW)
+- `backend/app/api/routes/report.py` (NEW)
+- `backend/app/main.py` — router wiring
+- `backend/tests/test_report_generator.py` (NEW)
+- `docs/api-contract.md`, `docs/project-status.md`, `docs/session-handoff.md`
+
+### Tests run
+- Backend: `..\.venv\Scripts\python.exe -m pytest -q` → **126 passed** (16 new; 1 pre-existing StarletteDeprecationWarning)
+- Compile: `..\.venv\Scripts\python.exe -m compileall -q app tests` → clean
+
+### Current state
+- `POST /api/v1/report/generate` and `POST /api/v1/analyze/full` live; `analyze/full` is the endpoint the frontend will call for one-request analysis.
+- Risk report remains an explainable screening signal — no fraud verdicts.
+
+### Next recommended task
+- Citation Integrity: Crossref DOI lookup service with mocked tests (timeout/429 paths), then wire `citation_results`/`metadata_results`/`ml_results` into the report generator so `modules_used` grows and confidence can exceed 0.6.
+
+### Dependencies or blockers
+- None. Report generator accepts the not-yet-built module outputs as `None` by design.
+
+### Commit / push
+- Commit: none (not requested)
+- Pushed to main: No
