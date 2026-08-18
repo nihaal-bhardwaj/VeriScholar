@@ -41,12 +41,14 @@ export const uploadAndProcessPaper = async (
   file: File,
   onProgress: (stage: string) => void
 ): Promise<CombinedAnalysisResponse> => {
-  onProgress("Uploading PDF to server...");
-  
+  onProgress("Uploading PDF...");
+
   const formData = new FormData();
   formData.append("file", file);
 
   try {
+    onProgress("Extracting text and references...");
+
     const response = await fetch(`${API_URL}/papers/extract`, {
       method: "POST",
       body: formData,
@@ -57,8 +59,8 @@ export const uploadAndProcessPaper = async (
       throw new Error(errorData?.detail || `Server error: ${response.status}`);
     }
 
-    onProgress("Parsing response...");
-    
+    onProgress("Generating report...");
+
     const data = await response.json();
     return buildCombinedAnalysis(data);
 

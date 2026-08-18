@@ -16,6 +16,9 @@ export interface PaperData {
   doi: string | null;
   doi_candidates: string[];
   abstract: string | null;
+  title: string | null;
+  authors: string[];
+  keywords: string[];
   references_text: string | null;
   references: Reference[];
   pages: ExtractedPage[];

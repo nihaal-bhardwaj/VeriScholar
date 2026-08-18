@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Mini Project",
+  title: "VeriScholar",
   description:
-    "Research-integrity screening tool that surfaces suspicious signals in research papers and product reviews.",
+    "VeriScholar screens research papers for integrity risk signals. Extract, verify and analyse with explainable, evidence-backed reports.",
 };
 
 export default function RootLayout({

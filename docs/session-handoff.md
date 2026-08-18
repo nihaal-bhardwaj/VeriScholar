@@ -406,3 +406,48 @@ Technical Lead, Backend & PDF Processing Engineer (orchestrator work)
 ### Commit / push
 - Commit: none (not requested)
 - Pushed to main: No
+
+---
+
+## 2026-08-18 — Frontend & Deployment Engineer (UI polish + VeriScholar branding)
+
+### Role
+Frontend & Deployment Engineer
+
+### Work completed
+- Rebranded the website to **VeriScholar** (per user decision; frontend only — backend service name and docs still say Mini Project):
+  - `frontend/app/layout.tsx`: metadata title "VeriScholar" + description
+  - `frontend/app/page.tsx`: header with logo mark, hero (badge, gradient headline, CTAs), feature cards with honest Live / "Coming soon" tags, disclaimer footer
+  - `frontend/app/analyser/page.tsx`: sticky blurred header with VeriScholar branding
+- Made analyser progress stages honest: removed the fake "Verifying metadata with Crossref…" and "Running ML models…" steps (those modules are not wired yet); stages now Upload → Extract → Generate, and `frontend/lib/api.ts` emits matching stage strings
+- Polished `ReportDashboard`: analysis ID displayed, title/authors added to Document Details, module status rows now show plain-language module descriptions; status badges got dots
+- Updated `frontend/lib/api-types.ts` `PaperData` with `title`, `authors`, `keywords` (fields the backend already returns)
+- Analyser hero copy corrected (no longer claims citation verification runs)
+
+### Files changed
+- `frontend/app/layout.tsx`
+- `frontend/app/page.tsx`
+- `frontend/app/analyser/page.tsx`
+- `frontend/components/progress/AnalysisProgress.tsx`
+- `frontend/components/report/ReportDashboard.tsx`
+- `frontend/lib/api.ts`
+- `frontend/lib/api-types.ts`
+- `docs/project-status.md`, `docs/session-handoff.md`
+
+### Tests run
+- Frontend: `npm run lint` → clean; `npm run build` → success (3 static routes: `/`, `/_not-found`, `/analyser`)
+- Backend untouched in this session (no tests rerun needed)
+
+### Current state
+- Website branded VeriScholar in the UI; Review Detector / Methodology remain `#` placeholders (team decision pending)
+- Frontend still calls `/papers/extract` and merges pending module blocks; `/analyze/full` exists in the backend and is the next integration target
+
+### Next recommended task
+- Wire the analyser to `POST /api/v1/analyze/full` and render the real `RiskReport` (risk score, level, confidence, summary, signals) in the dashboard.
+
+### Dependencies or blockers
+- None. Backend `/analyze/full` endpoint is already live and tested.
+
+### Commit / push
+- Commit: none (not requested)
+- Pushed to main: No

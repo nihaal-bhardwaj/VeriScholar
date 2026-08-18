@@ -41,15 +41,22 @@ export default function AnalyserPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-zinc-50 font-sans dark:bg-black">
-      <header className="flex w-full max-w-4xl items-center justify-between self-center px-6 py-6 border-b border-zinc-200 dark:border-zinc-800">
-        <Link href="/" className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 hover:text-zinc-600 transition-colors">
-          Mini Project
-        </Link>
-        <nav className="flex gap-6 text-sm text-zinc-600 dark:text-zinc-400">
-          <Link href="/analyser" className="text-zinc-900 dark:text-zinc-100 font-medium">Paper Analyser</Link>
-          <Link href="#" className="hover:text-zinc-900 dark:hover:text-zinc-100">Review Detector</Link>
-          <Link href="#" className="hover:text-zinc-900 dark:hover:text-zinc-100">Methodology</Link>
-        </nav>
+      <header className="sticky top-0 z-10 w-full border-b border-zinc-200/70 bg-zinc-50/80 backdrop-blur dark:border-zinc-800/70 dark:bg-black/70">
+        <div className="mx-auto flex w-full max-w-4xl items-center justify-between px-6 py-4">
+          <Link href="/" className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-sm font-bold text-white shadow-sm">
+              V
+            </span>
+            <span className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+              VeriScholar
+            </span>
+          </Link>
+          <nav className="flex gap-6 text-sm text-zinc-600 dark:text-zinc-400">
+            <Link href="/analyser" className="text-zinc-900 dark:text-zinc-100 font-medium">Paper Analyser</Link>
+            <Link href="#" className="hover:text-zinc-900 dark:hover:text-zinc-100">Review Detector</Link>
+            <Link href="#" className="hover:text-zinc-900 dark:hover:text-zinc-100">Methodology</Link>
+          </nav>
+        </div>
       </header>
 
       <main className="flex flex-1 flex-col items-center p-6 sm:p-12">
@@ -62,7 +69,7 @@ export default function AnalyserPage() {
                   Analyse a Research Paper
                 </h1>
                 <p className="text-lg text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto">
-                  Upload a PDF manuscript to extract metadata, verify citations, and screen for integrity risk signals.
+                  Upload a PDF manuscript to extract its metadata, references and structure, then screen it for integrity risk signals.
                 </p>
               </div>
               <PDFUploader onUpload={handleUpload} isUploading={false} />

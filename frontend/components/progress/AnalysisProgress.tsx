@@ -10,8 +10,6 @@ export default function AnalysisProgress({ currentStage }: AnalysisProgressProps
   const stages = [
     "Uploading PDF...",
     "Extracting text and references...",
-    "Verifying metadata with Crossref...",
-    "Running ML models...",
     "Generating report...",
   ];
 

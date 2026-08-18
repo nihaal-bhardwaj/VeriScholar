@@ -89,6 +89,18 @@ Living document. Update it at the end of every working session.
 - Tests: 16 new in `backend/tests/test_report_generator.py`; full backend suite 126/126 passing
 - `docs/api-contract.md` updated with both endpoints; no new dependency; existing tests untouched
 
+## Frontend UI polish + VeriScholar branding milestone
+
+- Rebranded the website to **VeriScholar** (user decision; reverts the earlier "Mini Project" naming in the frontend only):
+  - `frontend/app/layout.tsx` — metadata title/description
+  - `frontend/app/page.tsx` — landing header, hero, footer
+  - `frontend/app/analyser/page.tsx` — header
+- Landing page redesigned: sticky blurred header with logo mark, hero with badge + gradient headline + CTAs, "How it works" feature cards with honest Live / Coming-soon status tags, disclaimer footer
+- Analyser progress stages made honest: removed fake "Verifying metadata with Crossref…" / "Running ML models…" steps (those modules don't run yet); now Upload → Extract → Generate, matching the real pipeline
+- Report dashboard polished: analysis ID shown, title/authors added to Document Details, module status rows now carry plain-language descriptions of each module
+- `frontend/lib/api-types.ts` updated with `title`, `authors`, `keywords` fields (already returned by the backend)
+- Frontend lint and production build passing
+
 ## Current overall milestone
 
 ```text
