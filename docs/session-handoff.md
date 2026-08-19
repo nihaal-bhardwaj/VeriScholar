@@ -451,3 +451,138 @@ Frontend & Deployment Engineer
 ### Commit / push
 - Commit: none (not requested)
 - Pushed to main: No
+
+---
+
+## 2026-08-19 — Research Paper ML & Dataset Engineer
+
+### Role
+Research Paper ML & Dataset Engineer
+
+### Work completed
+- Phase 1 — rule-based NLP text feature extraction (`feature_extractor.py`)
+  - Group 1 readability (Flesch reading ease, Flesch-Kincaid grade, Gunning fog, ARI) via textstat
+  - Group 2 vocabulary (unique_word_ratio, avg_word_length, rare_word_ratio)
+  - Group 3 sentence structure (avg_sentence_length, sentence_length_variance, totals)
+  - Group 4 section consistency (abstract-to-body Jaccard similarity, section_style_variance over 4 sentence chunks)
+  - Group 5 academic writing (citation_density per 1000 words, passive_voice_ratio, hedge_word_ratio)
+  - Typed `TextFeatures` Pydantic schema in `backend/app/schemas/ml.py`
+  - NLTK data bootstrap (`punkt`, `punkt_tab`, `averaged_perceptron_tagger`) with offline-safe regex tokenizer fallback
+  - Edge cases: empty/whitespace text, single-sentence variance, empty abstract, division-by-zero, short text under 4 chunks, textstat failures
+  - Added `nltk` + `textstat` to `backend/requirements.txt` and installed them in the Python 3.13 environment
+- Wired nothing into `report_generator` — `ml_results` placeholder unchanged, no API contract change
+
+### Files changed
+- `backend/requirements.txt` (added `nltk>=3.9.0`, `textstat>=0.7.4`)
+- `backend/app/schemas/ml.py` (new — `TextFeatures`)
+- `backend/app/services/ml/__init__.py` (new package)
+- `backend/app/services/ml/feature_extractor.py` (new)
+- `backend/tests/test_feature_extractor.py` (new — 17 tests)
+- `docs/project-status.md`
+
+### Tests run
+- `python -m pytest` (Python 3.13) → **143 passed** (126 existing + 17 new), 1 pre-existing Starlette deprecation warning
+- All new tests local-only: no network calls, no file reads
+
+### Current state
+- ML text feature extraction Phase 1 complete and green
+- Still nothing produces `ml_results`; risk scoring/thresholding from features is the next step
+
+### Next recommended task
+- Phase 2: threshold logic mapping `TextFeatures` to explainable ML signals (e.g. low abstract-to-body similarity, high section-style variance) plus a `ml_results` producer matching the shared `ml_analysis` contract.
+
+### Dependencies or blockers
+- None. Extraction schema (full_text, abstract, pages) already available from the Technical Lead.
+- Note: two Python installs on this machine — the project env is Python 3.13 (`AppData\Local\Programs\Python\Python313`); `C:\Python314` does not have the project deps.
+
+### Commit / push
+- Commit: none (not requested)
+- Pushed to main: No
+
+---
+
+## 2026-08-19 — Research Paper ML & Dataset Engineer (Phase 2)
+
+### Role
+Research Paper ML & Dataset Engineer
+
+### Work completed
+- Phase 2 — anomaly scoring engine `backend/app/services/ml/anomaly_scorer.py`
+  - `analyze_text(features: TextFeatures) -> MLAnalysisResult` running all 10 threshold rules:
+    uniform_sentence_length (<5.0 variance, medium), vocabulary_inflation (>0.80, medium), abstract_body_mismatch (<0.15, high), style_shifting (>50.0, high), missing_hedging (<0.002, low), missing_citations (<0.5/1000 words, medium), low_readability (<10, low), high_readability (>80, low), passive_voice_absent (<0.05, low), short_paper (<1000 words, high)
+  - Scoring: high=15 / medium=8 / low=3, `ml_risk_contribution` capped at 100; confidence 0.3 (<500 words) / 0.5 (<1000) / 0.8 (>=1000); summary templates for 0 / 1-2 / 3-4 / 5+ signals; `passed_rules` for non-triggered rules
+- New schemas in `backend/app/schemas/ml.py`: `MLSignal` (rule/severity/message/evidence/weight + points property) and `MLAnalysisResult` (signals, passed_rules, ml_risk_contribution, confidence, features_used, summary)
+- Report generator integration:
+  - `ReportInput.ml_results` changed from `Optional[dict]` to `Optional[MLAnalysisResult]` (`backend/app/schemas/report.py`)
+  - `generate_report`: ML signals converted to `RiskSignal(source="ml")`, `ml_risk_contribution` added to the total score before the 100 cap, `passed_rules` appended to `passed_checks`, `"ml"` in `modules_used`
+  - Confidence: only ML ran → ML confidence; consistency + ML → `min(0.85, avg(consistency_score, ml confidence))`; consistency-only path unchanged (still ≤0.6)
+- `docs/api-contract.md` updated: `/report/generate` request example now shows a full `MLAnalysisResult`, and scoring/confidence rules documented
+
+### Files changed
+- `backend/app/schemas/ml.py` (added `MLSignal`, `MLAnalysisResult`)
+- `backend/app/services/ml/anomaly_scorer.py` (new)
+- `backend/app/schemas/report.py` (`ml_results` type change)
+- `backend/app/services/report_generator.py` (ML wiring + confidence logic)
+- `backend/tests/test_anomaly_scorer.py` (new — 33 tests: 10 rule triggers + non-triggers, contributions, confidence tiers, summaries, completeness, report-generator integration)
+- `docs/api-contract.md`, `docs/project-status.md`, `docs/session-handoff.md`
+
+### Tests run
+- `python -m pytest` (Python 3.13) → **176 passed** (143 existing + 33 new), 1 pre-existing Starlette deprecation warning
+- No existing tests modified
+
+### Current state
+- ML module produces `MLAnalysisResult` and the report generator consumes it; `ml_results` is still not populated by any endpoint (extractor + scorer not yet chained end to end)
+- Notes: rules 7 and 8 (low/high readability) are mutually exclusive, so the maximum achievable real contribution is 78.0 — the 100 cap is defensive
+
+### Next recommended task
+- Chain `extract_features` → `analyze_text` and expose the result (either a new `/api/v1/ml/analyze` endpoint or wiring into `/analyze/full`), coordinated with the Technical Lead.
+
+### Dependencies or blockers
+- None. `ReportInput.ml_results` type change is a coordinated schema change — documented in `docs/api-contract.md`; frontend currently sends `ml_results: null` so it is unaffected.
+
+### Commit / push
+- Commit: none (not requested)
+- Pushed to main: No
+
+---
+
+## 2026-08-19 — Research Paper ML & Dataset Engineer (Phase 3)
+
+### Role
+Research Paper ML & Dataset Engineer
+
+### Work completed
+- Phase 3 — wired the ML module into the live pipeline
+  - `backend/app/services/ml/ml_pipeline.py` — `run_ml_analysis(full_text, abstract, pages)` orchestrator chaining `extract_features` → `analyze_text`; catches any exception and returns a safe fallback `MLAnalysisResult` (empty signals/passed_rules, 0.0 contribution, 0.0 confidence, summary "ML analysis unavailable due to an internal error.") so the pipeline never crashes on ML failure
+  - New standalone endpoint `POST /api/v1/ml/analyze` (`backend/app/api/routes/ml.py`) taking `MLAnalysisRequest` (`full_text` required, `abstract`/`pages` optional) and returning `MLAnalysisResult`; registered in `main.py`
+  - `/api/v1/analyze/full` now runs extraction → consistency → ML → report; `ml_results` is populated with the ML analysis (full_text built by joining page texts), so `modules_used` is now `["consistency", "ml"]`
+  - No new dependencies
+- `docs/api-contract.md` updated: new `/ml/analyze` endpoint spec, `/analyze/full` response example showing `modules_used: ["consistency", "ml"]` and an ML signal
+
+### Files changed
+- `backend/app/services/ml/ml_pipeline.py` (new)
+- `backend/app/api/routes/ml.py` (new)
+- `backend/app/schemas/ml.py` (added `MLAnalysisRequest`)
+- `backend/app/api/routes/report.py` (ML wired into `/analyze/full`)
+- `backend/app/main.py` (registered ML router)
+- `backend/tests/test_ml_pipeline.py` (new — 6 tests), `backend/tests/test_ml_endpoint.py` (new — 6 tests), `backend/tests/test_analyze_full_ml.py` (new — 3 tests)
+- `backend/tests/test_report_generator.py` (updated 1 existing assertion — see note)
+- `docs/api-contract.md`, `docs/project-status.md`, `docs/session-handoff.md`
+
+### Tests run
+- `python -m pytest` (Python 3.13) → **191 passed** (176 prior + 15 new), 1 pre-existing Starlette deprecation warning
+- Confirmed `/analyze/full` returns `"ml" in modules_used` with source="ml" signals and positive confidence
+
+### Current state
+- ML is now a first-class pipeline stage: standalone endpoint + integrated into `/analyze/full`
+- Note: one existing test was updated — `test_analyze_full_endpoint_accepts_pdf` previously asserted `risk_score == 0.0`/`risk_level == "low"`; with ML wired in the sample paper now scores > 0, so the assertion now checks `risk_score >= 0.0` and `"ml" in modules_used`. This was a required, coordinated change caused by the intended behaviour change, not a regression.
+
+### Next recommended task
+- Frontend: display ML signals in the report dashboard (reuse the module-status rows); optional threshold tuning on real sample papers.
+
+### Dependencies or blockers
+- None. `ReportInput.ml_results` schema change is already coordinated; frontend currently sends `ml_results: null` in `/report/generate` and is unaffected.
+
+### Commit / push
+- Commit: none (not requested)
+- Pushed to main: No

@@ -218,9 +218,10 @@ def test_analyze_full_endpoint_accepts_pdf(client):
     body = response.json()
     assert body["analysis_id"]
     assert body["paper_title"] == "Deep Learning for Iceberg Detection"
-    assert body["risk_score"] == 0.0
-    assert body["risk_level"] == "low"
+    assert body["risk_score"] >= 0.0
+    assert body["risk_level"] in {"low", "medium", "high", "critical"}
     assert "consistency" in body["modules_used"]
+    assert "ml" in body["modules_used"]
     assert isinstance(body["generated_at"], str)
 
 

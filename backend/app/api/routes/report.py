@@ -9,6 +9,7 @@ from app.core.config import get_settings
 from app.schemas.paper import ReferenceEntry
 from app.schemas.report import ReportInput, RiskReport
 from app.services.consistency_checker import check_consistency
+from app.services.ml.ml_pipeline import run_ml_analysis
 from app.services.pdf_parser import (
     PDFCorruptError,
     PDFParseError,
@@ -40,9 +41,9 @@ def generate(request: ReportInput) -> RiskReport:
 def analyze_full(file: UploadFile | None = File(default=None)) -> RiskReport:
     """Run the full pipeline on an uploaded PDF in one request.
 
-    Extracts the paper, runs the consistency rules and generates the
-    unified risk report. Citation, metadata and ML modules are not
-    available yet and are reported as not used.
+    Extracts the paper, runs the consistency rules and the ML text
+    analysis, then generates the unified risk report. Citation and
+    metadata modules are not available yet and are reported as not used.
     """
     settings = get_settings()
     max_size_bytes = settings.max_upload_size_bytes
@@ -83,6 +84,12 @@ def analyze_full(file: UploadFile | None = File(default=None)) -> RiskReport:
         references=references,
     )
 
+    ml_result = run_ml_analysis(
+        full_text=" ".join(page.get("text", "") for page in parsed.pages),
+        abstract=parsed.abstract or "",
+        pages=parsed.pages,
+    )
+
     return generate_report(
         ReportInput(
             analysis_id=str(uuid.uuid4()),
@@ -91,5 +98,6 @@ def analyze_full(file: UploadFile | None = File(default=None)) -> RiskReport:
             abstract=parsed.abstract or "",
             keywords=parsed.keywords,
             consistency_report=consistency,
+            ml_results=ml_result,
         )
     )

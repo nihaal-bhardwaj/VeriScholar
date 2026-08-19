@@ -11,7 +11,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.routes import health, integrity, papers, report
+from app.api.routes import health, integrity, ml, papers, report
 from app.core.config import get_settings
 
 logger = logging.getLogger("mini-project")
@@ -68,6 +68,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 app.include_router(health.router, prefix=settings.api_prefix)
 app.include_router(papers.router, prefix=settings.api_prefix)
 app.include_router(integrity.router, prefix=settings.api_prefix)
+app.include_router(ml.router, prefix=settings.api_prefix)
 app.include_router(report.router, prefix=settings.api_prefix)
 
 

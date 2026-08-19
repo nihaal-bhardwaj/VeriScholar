@@ -11,6 +11,7 @@ fake-paper verdict.
 from datetime import datetime, timezone
 
 from app.schemas.consistency import ConsistencyReport
+from app.schemas.ml import MLAnalysisResult
 from app.schemas.report import ReportInput, RiskReport, RiskSignal
 
 _SEVERITY_POINTS = {"high": 15.0, "medium": 8.0, "low": 3.0}
@@ -56,10 +57,26 @@ def _modules_used(data: ReportInput) -> list[str]:
     return modules
 
 
-def _confidence(modules: list[str]) -> float:
-    """Confidence in the report based on which modules contributed."""
+def _confidence(data: ReportInput, modules: list[str]) -> float:
+    """Confidence in the report based on which modules contributed.
+
+    When only the ML module runs, the ML module's own confidence is used.
+    When both consistency and ML run, the two confidences are averaged and
+    capped at 0.85. Other combinations keep the generic module-count based
+    confidence.
+    """
     if not modules:
         return 0.0
+    if modules == ["ml"]:
+        return data.ml_results.confidence if data.ml_results is not None else 0.0
+    if "consistency" in modules and "ml" in modules:
+        consistency_conf = (
+            data.consistency_report.consistency_score
+            if data.consistency_report is not None
+            else 0.0
+        )
+        ml_conf = data.ml_results.confidence if data.ml_results is not None else 0.0
+        return round(min(0.85, (consistency_conf + ml_conf) / 2), 2)
     confidence = min(
         _CONFIDENCE_BASE + _CONFIDENCE_PER_EXTRA_MODULE * (len(modules) - 1),
         _MAX_CONFIDENCE,
@@ -92,25 +109,49 @@ def _signals_from_consistency(report: ConsistencyReport) -> list[RiskSignal]:
     return signals
 
 
+def _signals_from_ml(result: MLAnalysisResult) -> list[RiskSignal]:
+    """Convert ML anomaly signals into risk signals."""
+    signals: list[RiskSignal] = []
+    for signal in result.signals:
+        signals.append(
+            RiskSignal(
+                source="ml",
+                severity=signal.severity,
+                message=signal.message,
+                evidence=signal.evidence,
+                weight=round(signal.weight, 4),
+            )
+        )
+    return signals
+
+
 def generate_report(data: ReportInput) -> RiskReport:
     """Combine all module outputs into a single risk report."""
     modules = _modules_used(data)
 
-    signals: list[RiskSignal] = []
+    consistency_signals: list[RiskSignal] = []
     if data.consistency_report is not None:
-        signals.extend(_signals_from_consistency(data.consistency_report))
+        consistency_signals = _signals_from_consistency(data.consistency_report)
+
+    ml_signals: list[RiskSignal] = []
+    if data.ml_results is not None:
+        ml_signals = _signals_from_ml(data.ml_results)
+
+    signals = consistency_signals + ml_signals
 
     score = 0.0
-    for signal in signals:
+    for signal in consistency_signals:
         score += _SEVERITY_POINTS.get(signal.severity, 0.0)
+    if data.ml_results is not None:
+        score += data.ml_results.ml_risk_contribution
     score = round(min(score, _MAX_RISK_SCORE), 2)
 
     level = _risk_level(score)
-    passed_checks = (
-        list(data.consistency_report.passed_checks)
-        if data.consistency_report is not None
-        else []
-    )
+    passed_checks: list[str] = []
+    if data.consistency_report is not None:
+        passed_checks.extend(data.consistency_report.passed_checks)
+    if data.ml_results is not None:
+        passed_checks.extend(data.ml_results.passed_rules)
 
     return RiskReport(
         analysis_id=data.analysis_id,
@@ -118,7 +159,7 @@ def generate_report(data: ReportInput) -> RiskReport:
         paper_authors=list(data.paper_authors),
         risk_score=score,
         risk_level=level,
-        confidence=_confidence(modules),
+        confidence=_confidence(data, modules),
         summary=_summary(score, level),
         signals=signals,
         passed_checks=passed_checks,

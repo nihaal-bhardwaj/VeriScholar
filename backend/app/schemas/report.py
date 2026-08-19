@@ -5,6 +5,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from app.schemas.consistency import ConsistencyReport
+from app.schemas.ml import MLAnalysisResult
 
 
 class RiskSignal(BaseModel):
@@ -32,7 +33,7 @@ class ReportInput(BaseModel):
     consistency_report: ConsistencyReport | None = None
     citation_results: dict | None = None
     metadata_results: dict | None = None
-    ml_results: dict | None = None
+    ml_results: MLAnalysisResult | None = None
 
 
 class RiskReport(BaseModel):
