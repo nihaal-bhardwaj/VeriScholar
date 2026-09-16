@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     api_prefix: str = "/api/v1"
     max_upload_size_mb: int = 20
     cors_origins: str = "http://localhost:3000"
+    api_user_agent_email: str = "research-integrity@example.com"
 
     @property
     def max_upload_size_bytes(self) -> int:

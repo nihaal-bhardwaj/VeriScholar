@@ -67,6 +67,36 @@ export default function ReportDashboard({ data, onReset }: ReportDashboardProps)
         </button>
       </div>
 
+      {/* FINAL SCORE CARD */}
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-sm flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Overall Integrity Risk Score</h3>
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            Based on {data.final_assessment.confidence ? Math.round(data.final_assessment.confidence * 100) : 0}% confidence evaluation across available modules.
+          </p>
+        </div>
+        <div className="text-right">
+          <span className={`text-4xl font-bold ${data.final_assessment.risk_level === 'high' ? 'text-red-500' : data.final_assessment.risk_level === 'moderate' ? 'text-amber-500' : 'text-emerald-500'}`}>
+            {data.final_assessment.risk_score?.toFixed(1) || "0.0"}
+          </span>
+          <span className="block text-sm font-medium text-zinc-500 uppercase mt-1">
+            {data.final_assessment.risk_level || "Unknown"} RISK
+          </span>
+        </div>
+      </div>
+
+      {/* Main Signals from Modules */}
+      {data.ml_analysis.signals && data.ml_analysis.signals.length > 0 && (
+        <div className="bg-red-50/50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-2xl p-6 shadow-sm">
+          <h3 className="text-lg font-semibold text-red-900 dark:text-red-400 mb-4">Integrity Flags Detected</h3>
+          <ul className="space-y-2 list-disc list-inside text-sm text-red-800 dark:text-red-300">
+            {data.ml_analysis.signals.map((signal, idx) => (
+              <li key={idx} className="leading-relaxed">{signal}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
         {/* Paper Information */}
