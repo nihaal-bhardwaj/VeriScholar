@@ -323,7 +323,83 @@ Response — the typed `MLAnalysisResult` (same shape as `ml_results` in `/repor
 
 Rules implemented: `uniform_sentence_length`, `vocabulary_inflation`, `abstract_body_mismatch`, `style_shifting`, `missing_hedging`, `missing_citations`, `low_readability`, `high_readability`, `passive_voice_absent`, `short_paper`.
 
+## Fake Review Detector endpoints
+
+### `POST /reviews/analyze`
+
+Scrapes product reviews from an e-commerce URL (Amazon or Flipkart) using ScraperAPI and generates an authenticity and trust assessment report.
+
+Request body:
+
+```json
+{
+  "product_url": "https://www.amazon.com/dp/B08N5WRWNW"
+}
+```
+
+Validations & Status codes:
+- `200` — Analysis complete, returns `ProductReviewReport`
+- `400` — Invalid or unsupported product URL
+- `422` — Missing `product_url` field
+- `502` — ScraperAPI failed / remote site unreachable
+- `504` — ScraperAPI timeout
+- `500` — Unexpected server error or unconfigured scraper key
+
+Response:
+
+```json
+{
+  "product_url": "https://www.amazon.com/dp/B08N5WRWNW",
+  "product_title": "Wireless Noise-Canceling Over-Ear Headphones",
+  "total_reviews_analyzed": 10,
+  "overall_trust_score": 18.5,
+  "trust_level": "low_trust_concern",
+  "reviews": [
+    {
+      "review_text": "The battery life is exceptional and the audio quality exceeded my expectations.",
+      "reviewer_name": "Alice M.",
+      "rating": 5,
+      "review_date": "January 15, 2024",
+      "verified_purchase": true,
+      "authenticity_score": 0.0,
+      "classification": "likely_genuine",
+      "signals": []
+    }
+  ],
+  "batch_signals": [],
+  "duplicate_review_count": 0,
+  "summary": "Product reviews appear mostly authentic with low indicators of manipulation. Analyzed 10 reviews.",
+  "generated_at": "2024-03-15T12:00:00Z"
+}
+```
+
+### `POST /reviews/analyze-manual`
+
+Fallback endpoint for analyzing manually submitted product reviews without scraping.
+
+Request body:
+
+```json
+{
+  "reviews": [
+    {
+      "review_text": "Great battery life and clear screen. The delivery was on time.",
+      "reviewer_name": "John Doe",
+      "rating": 5,
+      "review_date": "2024-03-01",
+      "verified_purchase": true
+    }
+  ]
+}
+```
+
+Status codes:
+- `200` — Returns `ProductReviewReport`. An empty reviews list returns 200 with `trust_level: "insufficient_data"`.
+- `422` — Validation error on payload
+- `500` — Internal server error
+
 ## Future combined analysis contract
+
 
 All future team modules **must** follow this shared response shape. Each sub-analysis reports its own status; unimplemented modules return `"pending"` with `null` values, never fabricated numbers.
 
@@ -372,3 +448,92 @@ All future team modules **must** follow this shared response shape. Each sub-ana
 - Do not change field names in the shared contract without updating this document and coordinating with all members.
 - New endpoints go under `/api/v1` with the module name, e.g. `/api/v1/metadata/verify`, `/api/v1/citations/verify`.
 - Responses must be typed Pydantic models.
+
+---
+
+## Fake Review Detector Module Endpoints
+
+### 1. Product URL Review Analysis
+
+```http
+POST /api/v1/reviews/analyze
+Content-Type: application/json
+```
+
+Scrapes product page reviews from preview widgets on supported e-commerce platforms and generates an explainable authenticity assessment report.
+
+**Supported E-Commerce Platforms (5 sites):**
+- **Amazon** (`amazon.in`, `amazon.com`, etc.)
+- **Flipkart** (`flipkart.com`)
+- **Meesho** (`meesho.com`)
+- **Ajio** (`ajio.com`)
+- **Shopsy** (`shopsy.in`)
+
+**Request Body:**
+```json
+{
+  "product_url": "https://www.amazon.in/dp/B08N5WRWNW"
+}
+```
+
+**Response (`200 OK` — `ProductReviewReport`):**
+```json
+{
+  "product_url": "https://www.amazon.in/dp/B08N5WRWNW",
+  "product_title": "Wireless Noise-Canceling Headphones",
+  "source_site": "amazon",
+  "total_reviews_analyzed": 12,
+  "overall_trust_score": 18.5,
+  "trust_level": "low_trust_concern",
+  "reviews": [
+    {
+      "review_text": "Battery lasts a solid 40 hours and sound stage is wide.",
+      "reviewer_name": "Aman S.",
+      "rating": 5,
+      "review_date": "2024-01-15",
+      "verified_purchase": true,
+      "authenticity_score": 0.0,
+      "classification": "likely_genuine",
+      "signals": []
+    }
+  ],
+  "batch_signals": [],
+  "duplicate_review_count": 0,
+  "summary": "12 reviews analyzed with low trust concern.",
+  "generated_at": "2024-03-01T12:00:00Z"
+}
+```
+
+**Status Codes:**
+- `200`: Analysis completed successfully.
+- `400`: Unsupported e-commerce domain or malformed URL syntax.
+- `422`: Missing or invalid request payload fields.
+- `502`: External scraping service failure (`ScraperAPIError`).
+- `504`: Scraper gateway timeout (`ScraperTimeoutError`).
+- `500`: Internal server error or missing `SCRAPERAPI_KEY`.
+
+### 2. Manual Reviews Analysis (Fallback)
+
+```http
+POST /api/v1/reviews/analyze-manual
+Content-Type: application/json
+```
+
+Analyzes manually submitted review text and ratings directly without external web scraping. Used as a direct fallback when URL scraping times out or site access is restricted.
+
+**Request Body:**
+```json
+{
+  "reviews": [
+    {
+      "review_text": "Used it daily for 60 days, noticeable improvement in stamina.",
+      "rating": 5,
+      "verified_purchase": true
+    }
+  ]
+}
+```
+
+**Response (`200 OK` — `ProductReviewReport`):**
+Returns `ProductReviewReport` formatted identically to `/api/v1/reviews/analyze`.
+

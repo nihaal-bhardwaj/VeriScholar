@@ -68,6 +68,15 @@ def _vocabulary_inflation(features: TextFeatures) -> MLSignal | None:
 
 def _abstract_body_mismatch(features: TextFeatures) -> MLSignal | None:
     value = features.abstract_to_body_similarity
+    if value is None:
+        return MLSignal(
+            rule="abstract_body_mismatch",
+            severity="low",
+            message="Abstract-body similarity could not be evaluated due to missing or unverified abstract",
+            evidence="Abstract unavailable",
+            weight=0.0,
+            status="not_evaluable",
+        )
     if value < _ABSTRACT_BODY_THRESHOLD:
         return MLSignal(
             rule="abstract_body_mismatch",
@@ -75,6 +84,7 @@ def _abstract_body_mismatch(features: TextFeatures) -> MLSignal | None:
             message="Abstract content is significantly different from paper body — may indicate a mismatched or fabricated abstract",
             evidence=f"Abstract-body similarity: {value:.2f} (threshold: {_ABSTRACT_BODY_THRESHOLD:.2f})",
             weight=_WEIGHT_HIGH,
+            status="triggered",
         )
     return None
 
@@ -212,27 +222,27 @@ def _summary(signal_count: int) -> str:
 
 
 def analyze_text(features: TextFeatures) -> MLAnalysisResult:
-    """Run every rule over the given features and return the analysis.
-
-    A ``TextFeatures`` with all-zero values is run normally — several
-    low/threshold rules naturally trigger, which is expected behaviour
-    for input with no measurable content.
-    """
+    """Run every rule over the given features and return the analysis."""
     signals: list[MLSignal] = []
     passed_rules: list[str] = []
+    not_evaluable_rules: list[str] = []
     for name, check in _RULES:
         signal = check(features)
         if signal is not None:
-            signals.append(signal)
+            if signal.status == "not_evaluable":
+                not_evaluable_rules.append(name)
+            else:
+                signals.append(signal)
         else:
             passed_rules.append(name)
 
-    contribution = sum(_SEVERITY_POINTS.get(s.severity, 0.0) for s in signals)
+    contribution = sum(s.points for s in signals)
     contribution = round(min(contribution, _MAX_RISK_CONTRIBUTION), 2)
 
     return MLAnalysisResult(
         signals=signals,
         passed_rules=passed_rules,
+        not_evaluable_rules=not_evaluable_rules,
         ml_risk_contribution=contribution,
         confidence=_confidence(features.total_words),
         features_used=features,

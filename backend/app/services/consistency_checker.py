@@ -25,7 +25,7 @@ _YEAR_RE = re.compile(r"\b(?:1[5-9]\d{2}|20\d{2})\b")
 # RULE 2 — figure reference consistency
 
 _FIGURE_REF_RE = re.compile(r"\b(?:figure|fig\.?)\s*(\d+)\b", re.IGNORECASE)
-_FIGURE_DEF_RE = re.compile(r"\b(?:figure|fig\.?)\s*(\d+)\s*:", re.IGNORECASE)
+_FIGURE_DEF_RE = re.compile(r"\b(?:figure|fig\.?)\s*(\d+)\s*(?::\s*|[.\-—][ \t]+[A-Z(\[])", re.IGNORECASE)
 
 # RULE 3 — author name consistency
 
@@ -230,9 +230,11 @@ def _check_reference_continuity(
     references: list[ReferenceEntry],
     flags: list[ConsistencyFlag],
     passed: list[str],
+    warnings: list[str] | None = None,
 ) -> None:
     """Rule 5: every reference cited in the text must be in the reference list."""
-    defined = {reference.number for reference in references}
+    defined = {reference.number for reference in references if reference.number is not None}
+    unnumbered_count = sum(1 for reference in references if reference.number is None)
 
     evidence_by_number: dict[int, str] = {}
     cited: set[int] = set()
@@ -245,17 +247,55 @@ def _check_reference_continuity(
 
     missing = sorted(cited - defined)
     if missing:
-        for number in missing:
-            flags.append(
-                ConsistencyFlag(
-                    rule="reference_number_continuity",
-                    severity="medium",
-                    message=(
-                        f"Reference [{number}] cited in text but not found in reference list"
-                    ),
-                    evidence=evidence_by_number.get(number, ""),
-                )
+        # If unnumbered reference entries exist at the beginning of the bibliography
+        # (e.g. from margin-cropping or formatting), cited numbers below the lowest
+        # numbered reference that fit within the unnumbered entry count are accounted for.
+        first_defined = min(defined) if defined else 0
+        accounted_by_unnumbered = [
+            n for n in missing if n < first_defined and n <= unnumbered_count
+        ]
+        unaccounted_missing = [n for n in missing if n not in accounted_by_unnumbered]
+
+        if accounted_by_unnumbered and warnings is not None:
+            warnings.append(
+                f"{len(accounted_by_unnumbered)} cited reference numbers (including "
+                f"[{accounted_by_unnumbered[0]}]..[{accounted_by_unnumbered[-1]}]) correspond to "
+                f"unnumbered bibliography entries resulting from document layout or margin clipping"
             )
+
+        if unaccounted_missing:
+            if len(unaccounted_missing) > 5:
+                flags.append(
+                    ConsistencyFlag(
+                        rule="reference_number_continuity",
+                        severity="medium",
+                        message=(
+                            f"Reference list appears incomplete: {len(unaccounted_missing)} cited references not found "
+                            f"in reference list (including [{unaccounted_missing[0]}] through [{unaccounted_missing[-1]}])"
+                        ),
+                        evidence=evidence_by_number.get(unaccounted_missing[0], "") + " ...",
+                    )
+                )
+            else:
+                for number in unaccounted_missing:
+                    flags.append(
+                        ConsistencyFlag(
+                            rule="reference_number_continuity",
+                            severity="medium",
+                            message=(
+                                f"Reference [{number}] cited in text but not found in reference list"
+                            ),
+                            evidence=evidence_by_number.get(number, ""),
+                        )
+                    )
+        else:
+            msg = (
+                "reference_number_continuity: every reference cited in text appears "
+                "in the reference list"
+            )
+            if accounted_by_unnumbered:
+                msg += " (including unnumbered bibliography entries)"
+            passed.append(msg)
     else:
         passed.append(
             "reference_number_continuity: every reference cited in text appears "
@@ -295,7 +335,7 @@ def check_consistency(
     _check_figure_consistency(text, flags, passed)
     _check_author_consistency(text, author_list, flags, passed)
     _check_section_structure(text, warnings, passed)
-    _check_reference_continuity(text, reference_list, flags, passed)
+    _check_reference_continuity(text, reference_list, flags, passed, warnings)
 
     total = len(flags) + len(warnings) + len(passed)
     score = len(passed) / total if total else 1.0

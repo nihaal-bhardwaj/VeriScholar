@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     max_upload_size_mb: int = 20
     cors_origins: str = "http://localhost:3000"
     api_user_agent_email: str = "research-integrity@example.com"
+    demo_mode: bool = False
+    scraperapi_key: str = ""
+    groq_api_key: str = ""
 
     @property
     def max_upload_size_bytes(self) -> int:

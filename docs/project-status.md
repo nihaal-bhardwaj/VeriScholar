@@ -8,7 +8,7 @@ Living document. Update it at the end of every working session.
 - **Primary module:** Research Paper Integrity Risk Detector
 - **Secondary module:** Fake Review Detector
 - **Current stage:** Phase 1 complete — title, authors, abstract boundary cleanup, and schema/API integration; docs and sample responses updated to match.
-- **Last known stable commit:** `36cb002` — Fix npm dependency vulnerabilities via postcss and sharp overrides
+- **Last known stable commit:** `ce336f1` — Integrate citation, review, and frontend analysis flows
 - **Test status:** Backend 86/86 passing; frontend lint and production build passing
 
 > The commit hash above is checked against Git history on every session start. If `git log` shows a newer commit, treat that newer commit as the latest and update this document.
@@ -104,18 +104,30 @@ Living document. Update it at the end of every working session.
 ## Current overall milestone
 
 ```text
-Phase 1 complete: title, authors, abstract boundary cleanup, and schema/API integration (uncommitted, awaiting commit/push).
+Phase 1 complete: title, authors, abstract boundary cleanup, and schema/API integration; coordinated implementation is verified and committed in `ce336f1`.
 ML text feature extraction Phase 1 + anomaly scoring Phase 2 + pipeline wiring Phase 3 complete (176 → 191 tests green).
 ```
+
+## Fake Review Detector — AI-powered Review Analysis with Groq (Llama 3.3 70B) & Incoherence Detection
+
+- Integrated Groq API (`llama-3.3-70b-versatile`) into Fake Review Detector pipeline:
+  - `backend/requirements.txt`: Added `groq>=0.9.0`
+  - `backend/app/core/config.py`: Added `groq_api_key: str = ""`
+  - `backend/app/schemas/reviews.py`: Added `LLMSignal`, `LLMReviewAnalysis`, and updated `ReviewAnalysisResult` with `analyzed_by` and `reasoning`
+  - `backend/app/services/reviews/llm_analyzer.py`: LLM review analyzer service with official Groq SDK, strict 10s timeout, fallback prompt retry on malformed JSON, safe error fallbacks (`timeout`, `api_error`, `not_configured`, `parse_error`), and 1500 char text truncation. Prompt enhanced to detect product incoherence, category confusion, mixed signal contradictions, implausible causal chains, and nonsense text, with 0-10 scoring guidelines for bot/nonsense reviews.
+  - `backend/app/services/reviews/review_analyzer.py`: Added Rule 8 `product_category_incoherence` checking across 5 term groups (electronics, haircare, health/body, food/taste, clothing). Flagged as high severity when terms from 3+ unrelated groups are mentioned together.
+  - `backend/app/services/reviews/review_report_generator.py`: Fixed pre-filter gating logic so LLM runs on all reviews except <= 5 words and factual high-severity duplicates; zero-signal, low, medium, and non-duplicate high-severity reviews now route to LLM. Applied score inversion (`suspicion_score = 100 - llm_authenticity_score`) and combined with heuristic score taking the max when high-severity heuristics fire.
+  - `frontend/lib/review-types.ts` & `frontend/components/reviews/ReviewReportDashboard.tsx`: Subtle "AI Analysis" / "Rule-based" badges on review cards, and "AI Assessment:" section in the "Why?" drawer
+  - 16 unit tests in `backend/tests/test_llm_analyzer.py` and 27 in `backend/tests/test_review_analyzer.py`; full backend test suite at 284/284 passed; Next.js frontend production build passing
 
 ## Per-role status
 
 | Role | Completed | Current priority | Next deliverable | Dependencies | Known blockers |
 | --- | --- | --- | --- | --- | --- |
-| Technical Lead, Backend & PDF Processing Engineer | FastAPI app, health + extract endpoints, parser, tests, API contract; five-paper baseline, ground truth and parser comparison; structured reference extraction (numbered, hanging markers, conservative author-year, per-entry DOI); Phase 1: conservative title extraction, conservative author extraction, abstract boundary cleanup, schema/API integration of `title` + `authors` (86 tests); report generator: `RiskReport` combiner with scoring/levels/confidence, `POST /report/generate` and `POST /analyze/full` endpoints (16 tests, 126/126 suite green) | Extract keywords/index terms; section-heading detection; page-number/evidence tracking | Keywords and index-terms extraction with regression tests | None (parser runs standalone); Phase-1 work uncommitted and awaiting team commit/push | None |
+| Technical Lead, Backend & PDF Processing Engineer | FastAPI app, health + extract endpoints, parser, tests, API contract; five-paper baseline, ground truth and parser comparison; structured reference extraction (numbered, hanging markers, conservative author-year, per-entry DOI); Phase 1: conservative title extraction, conservative author extraction, abstract boundary cleanup, schema/API integration of `title` + `authors` (86 tests); report generator: `RiskReport` combiner with scoring/levels/confidence, `POST /report/generate` and `POST /analyze/full` endpoints (16 tests, 126/126 suite green) | Extract keywords/index terms; section-heading detection; page-number/evidence tracking | Keywords and index-terms extraction with regression tests | None (parser runs standalone) | None |
 | Research Paper ML & Dataset Engineer | ML Phase 1: rule-based NLP text feature extractor — `TextFeatures` schema (`backend/app/schemas/ml.py`) + `backend/app/services/ml/feature_extractor.py` covering readability (textstat), vocabulary, sentence structure, abstract/body similarity, section-style variance, citation density, passive voice and hedging; offline-safe NLTK bootstrap; 17 new tests (143/143 suite green). ML Phase 2: anomaly scoring engine `backend/app/services/ml/anomaly_scorer.py` — 10 threshold rules producing `MLSignal`/`MLAnalysisResult` (ml_risk_contribution capped at 100, confidence by text size 0.3/0.5/0.8, summary templates); wired into `report_generator` via `ReportInput.ml_results: Optional[MLAnalysisResult]` (ml signals → RiskSignal source="ml", contribution added to score, confidence = ML confidence when ML-only or min(0.85, avg) with consistency); API contract updated; 33 new tests (176/176 suite green). ML Phase 3: pipeline wiring — `ml_pipeline.py` orchestrator chaining extractor→scorer with safe fallback on errors; `/api/v1/ml/analyze` standalone endpoint; ML integrated into `/api/v1/analyze/full` (`modules_used: ["consistency", "ml"]`); 15 new tests (191/191 suite green) | Wire ML result into the frontend report dashboard; tune thresholds on real papers | ML module is fully wired end to end; next is frontend display of ML signals + optional threshold tuning | Extraction schema from Technical Lead (available); `ReportInput.ml_results` schema change coordinated in `docs/api-contract.md` | None |
-| Citation Integrity, Metadata Verification & Fake Review Engineer | Local consistency rules engine (5 rules: date, figure, author, section, reference-number continuity), typed `ConsistencyReport` schema, `POST /api/v1/integrity/check` endpoint, 13 tests (110/110 backend green) | Build Crossref DOI lookup with mocked tests | A metadata-verification service that returns matched fields, mismatches, confidence and warnings | Extracted DOI/title/author fields from parser (available) | None |
-| Frontend & Deployment Engineer | Next.js scaffold; PDF upload flow; mock analysis-progress UI; real backend API integration (fetch, FormData, CORS) | Build the remaining real-time progress indicators once WebSocket/SSE is added, or wait for next module | A complete frontend flow using the live FastAPI backend | Stable API contract | None |
+| Citation Integrity, Metadata Verification & Fake Review Engineer | Local consistency rules engine (5 rules), typed `ConsistencyReport` schema, `POST /api/v1/integrity/check` endpoint; Fake Review Detector scraper, batch analyzer, rule-based analyzer with specificity, before/after narrative heuristics, and Rule 8 product category incoherence; Groq API (Llama 3.3 70B) LLM analyzer service with corrected pre-filtering, score inversion, prompt incoherence detection, structured JSON fallback retry, batch rate-limiting delay, safe error handling, and frontend badges/reasoning display (284/284 backend suite green) | Production scraping resilience and external metadata integrations | Crossref DOI lookup or extended e-commerce platforms | None | None |
+| Frontend & Deployment Engineer | Next.js scaffold; PDF upload flow; mock analysis-progress UI; real backend API integration (fetch, FormData, CORS); Fake Review Detector UI with manual input & URL scraping, circular progress ring, badges, and expandable "Why?" drawer | Build remaining real-time progress indicators once WebSocket/SSE is added | Complete frontend flow using live FastAPI backend | Stable API contract | None |
 
 ## Update rules
 
@@ -130,3 +142,4 @@ Every completed session must update this document with:
 - API contract changes
 
 Do not allow completed work to remain marked as pending.
+

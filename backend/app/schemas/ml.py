@@ -32,7 +32,9 @@ class TextFeatures(BaseModel):
     total_paragraphs: int = Field(default=0, description="Total paragraph count")
 
     # GROUP 4 — section consistency
-    abstract_to_body_similarity: float = Field(default=0.0, description="Jaccard word overlap between abstract and body")
+    abstract_to_body_similarity: float | None = Field(
+        default=None, description="Jaccard word overlap between abstract and body; None if abstract unavailable"
+    )
     section_style_variance: float = Field(default=0.0, description="Variance of sentence length across 4 text chunks")
 
     # GROUP 5 — academic writing
@@ -54,10 +56,13 @@ class MLSignal(BaseModel):
     message: str = Field(description="Human-readable explanation of the finding")
     evidence: str = Field(description="Feature value and threshold that triggered the rule")
     weight: float = Field(description="Share of the maximum per-signal score")
+    status: str = Field(default="triggered", description="'triggered', 'passed', or 'not_evaluable'")
 
     @property
     def points(self) -> float:
         """Risk points contributed by this signal's severity."""
+        if self.status != "triggered":
+            return 0.0
         return _SEVERITY_POINTS.get(self.severity, 0.0)
 
 
@@ -70,6 +75,9 @@ class MLAnalysisResult(BaseModel):
 
     signals: list[MLSignal] = Field(default_factory=list, description="All triggered rules")
     passed_rules: list[str] = Field(default_factory=list, description="Rule names that did not trigger")
+    not_evaluable_rules: list[str] = Field(
+        default_factory=list, description="Rule names that could not be evaluated due to missing input data"
+    )
     ml_risk_contribution: float = Field(default=0.0, description="Points contributed to the final risk score, 0-100")
     confidence: float = Field(default=0.0, description="Confidence in the analysis based on text availability, 0-1")
     features_used: TextFeatures = Field(description="The raw features that were analyzed")

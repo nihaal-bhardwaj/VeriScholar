@@ -1,130 +1,412 @@
+"use client";
+
+import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import { RiskReport } from "../lib/mockData";
+import AnalysisProgress from "../components/progress/AnalysisProgress";
+import ReportDashboard from "../components/report/ReportDashboard";
+import AnalysisError from "../components/AnalysisError";
 
-const navItems = [
-  { label: "Paper Analyser", href: "/analyser", active: true },
-  { label: "Review Detector", href: "#", active: false },
-  { label: "Methodology", href: "#", active: false },
-];
+export default function HomePage() {
+  const [viewState, setViewState] = useState<"landing" | "progress" | "report" | "error">("landing");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isMockMode, setIsMockMode] = useState<boolean>(false);
+  const [reportData, setReportData] = useState<RiskReport | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string>("");
+  const [inlineValidationError, setInlineValidationError] = useState<string | null>(null);
+  const [isDragOver, setIsDragOver] = useState<boolean>(false);
+  const [theme, setTheme] = useState<"dark" | "light">(() => {
+    if (typeof document !== "undefined") {
+      const currentTheme = document.documentElement.getAttribute("data-theme");
+      if (currentTheme === "light" || currentTheme === "dark") return currentTheme;
+    }
+    return "dark";
+  });
 
-const features = [
-  {
-    title: "Paper Extraction",
-    description:
-      "Extracts title, authors, abstract, references, DOI, keywords and pages from uploaded PDFs.",
-    status: "Live",
-  },
-  {
-    title: "Integrity & Consistency Checks",
-    description:
-      "Local rules screen for date, figure, author, section and reference-number inconsistencies.",
-    status: "Live",
-  },
-  {
-    title: "Citation & ML Screening",
-    description:
-      "Crossref metadata verification and ML risk assessment are under construction.",
-    status: "Coming soon",
-  },
-];
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-export default function Home() {
+  // Synchronize theme attribute on mount and toggle
+  useEffect(() => {
+    if (!document.documentElement.getAttribute("data-theme")) {
+      document.documentElement.setAttribute("data-theme", "dark");
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    document.documentElement.setAttribute("data-theme", next);
+  };
+
+  const validateAndProcessFile = (file: File) => {
+    setInlineValidationError(null);
+
+    // Client-side validations (Section 10)
+    if (!file.name.toLowerCase().endsWith(".pdf") && file.type !== "application/pdf") {
+      setInlineValidationError("Please upload a PDF file.");
+      return;
+    }
+
+    if (file.size > 40 * 1024 * 1024) {
+      setInlineValidationError("This file is too large. VeriScholar accepts PDFs up to 15MB.");
+      return;
+    }
+
+    setSelectedFile(file);
+    setIsMockMode(false);
+    setViewState("progress");
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      validateAndProcessFile(e.target.files[0]);
+    }
+  };
+
+  const handleSampleClick = () => {
+    setInlineValidationError(null);
+    setSelectedFile(null);
+    setIsMockMode(true);
+    setViewState("progress");
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      validateAndProcessFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleAnalysisComplete = (data: RiskReport) => {
+    setReportData(data);
+    setViewState("report");
+  };
+
+  const handleAnalysisError = (msg: string) => {
+    setErrorMessage(msg);
+    setViewState("error");
+  };
+
+  const handleReset = () => {
+    setViewState("landing");
+    setSelectedFile(null);
+    setIsMockMode(false);
+    setReportData(null);
+    setErrorMessage("");
+    setInlineValidationError(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   return (
-    <div className="flex min-h-screen flex-col bg-zinc-50 font-sans dark:bg-black">
-      <header className="sticky top-0 z-10 w-full border-b border-zinc-200/70 bg-zinc-50/80 backdrop-blur dark:border-zinc-800/70 dark:bg-black/70">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-4">
-          <Link href="/" className="flex items-center gap-2.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-sm font-bold text-white shadow-sm">
-              V
+    <div className="min-h-screen flex flex-col justify-between relative z-10">
+      {/* NAVBAR (Section 5) */}
+      <header className="sticky top-0 z-50 w-full bg-[var(--bg)]/80 backdrop-blur-sm border-b border-[var(--border-soft)]">
+        <div className="container-wide h-[76px] flex items-center justify-between">
+          {/* Wordmark (no icon, no gradient) */}
+          <Link href="/" onClick={handleReset} className="flex items-baseline cursor-pointer">
+            <span className="font-sans font-semibold text-lg tracking-tight text-[var(--text)]">
+              Veri
             </span>
-            <span className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-              VeriScholar
+            <span className="font-serif italic font-medium text-xl text-[var(--text)]">
+              Scholar
             </span>
           </Link>
-          <nav className="flex gap-6 text-sm text-zinc-600 dark:text-zinc-400">
-            {navItems.map((item) => (
+
+          {/* Navigation Links & Theme Toggle */}
+          <div className="flex items-center gap-8">
+            <nav className="flex items-center gap-6 text-sm font-sans">
               <Link
-                key={item.label}
-                href={item.href}
-                className={
-                  item.active
-                    ? "font-medium text-zinc-900 dark:text-zinc-100"
-                    : "hover:text-zinc-900 dark:hover:text-zinc-100"
-                }
+                href="/"
+                onClick={handleReset}
+                className="text-[var(--text)] border-b border-[var(--accent)] pb-0.5 cursor-pointer"
               >
-                {item.label}
+                Analyzer
               </Link>
-            ))}
-          </nav>
+              <Link
+                href="/methodology"
+                className="text-[var(--text-muted)] hover:text-[var(--text)] pb-0.5 transition-colors cursor-pointer"
+              >
+                Methodology
+              </Link>
+              <Link
+                href="/reviews"
+                className="text-[var(--text-muted)] hover:text-[var(--text)] pb-0.5 transition-colors cursor-pointer"
+              >
+                Review Checker
+              </Link>
+            </nav>
+
+            {/* Theme Toggle Button */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="text-[var(--text-muted)] hover:text-[var(--text)] transition-colors p-1 cursor-pointer"
+              aria-label="Toggle theme"
+            >
+              {theme === "dark" ? (
+                // Moon Icon
+                <svg
+                  className="w-[17px] h-[17px]"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                </svg>
+              ) : (
+                // Sun Icon
+                <svg
+                  className="w-[17px] h-[17px]"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="12" cy="12" r="5" />
+                  <line x1="12" y1="1" x2="12" y2="3" />
+                  <line x1="12" y1="21" x2="12" y2="23" />
+                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                  <line x1="1" y1="12" x2="3" y2="12" />
+                  <line x1="21" y1="12" x2="23" y2="12" />
+                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                </svg>
+              )}
+            </button>
+          </div>
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col items-center gap-12 px-6 py-20">
-        <div className="flex flex-col items-center gap-6 text-center">
-          <span className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-4 py-1.5 text-xs font-medium text-indigo-700 dark:border-indigo-900/60 dark:bg-indigo-950/40 dark:text-indigo-300">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            Research Integrity Screening
-          </span>
-          <h1 className="max-w-3xl text-5xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-6xl">
-            Trust what you read.
-            <span className="block bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent dark:from-indigo-400 dark:to-purple-400">
-              Verify what matters.
-            </span>
-          </h1>
-          <p className="max-w-2xl text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            VeriScholar analyses uploaded research papers for suspicious
-            signals and produces explainable, evidence-backed risk reports —
-            designed for human review, never as a final verdict.
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
-            <Link
-              href="/analyser"
-              className="rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all hover:shadow-xl hover:shadow-indigo-500/30 hover:brightness-110"
-            >
-              Analyse a Paper
-            </Link>
-            <Link
-              href="#features"
-              className="rounded-xl border border-zinc-300 bg-white px-6 py-3 text-sm font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            >
-              How it works
-            </Link>
-          </div>
-        </div>
+      {/* MAIN VIEWPORT */}
+      <main className="flex-1">
+        {/* LANDING VIEW */}
+        {viewState === "landing" && (
+          <div className="container-text py-16 sm:py-24 space-y-20">
+            {/* HERO SECTION */}
+            <section className="space-y-6">
+              <h1 className="font-serif font-medium text-[clamp(34px,5vw,52px)] text-[var(--text)] max-w-[16ch] leading-[1.16] tracking-tight">
+                A quiet second reader for every paper you submit
+              </h1>
 
-        <section id="features" className="grid w-full gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {features.map((feature) => (
-            <div
-              key={feature.title}
-              className="flex flex-col gap-3 rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900"
-            >
-              <div className="flex items-center justify-between">
-                <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
-                  {feature.title}
-                </h3>
-                <span
-                  className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                    feature.status === "Live"
-                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                      : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
-                  }`}
-                >
-                  {feature.status}
-                </span>
-              </div>
-              <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-                {feature.description}
+              <p className="font-sans text-[17px] text-[var(--text-muted)] max-w-[54ch] leading-relaxed">
+                VeriScholar checks a paper&apos;s metadata, citations, and internal consistency against the public record, then tells you plainly what it found — and what it didn&apos;t.
               </p>
-            </div>
-          ))}
-        </section>
 
-        <p className="text-sm text-zinc-500 dark:text-zinc-500">
-          The Review Detector and Methodology sections are under construction.
-        </p>
+              {/* Upload Action Row */}
+              <div className="pt-2 space-y-2">
+                <div className="flex items-center gap-4">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    className="hidden"
+                    onChange={handleFileInputChange}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="btn cursor-pointer"
+                  >
+                    Upload a paper
+                  </button>
+                  <span className="font-sans text-xs text-[var(--text-muted)]">
+                    PDF, up to 15MB
+                  </span>
+                </div>
+
+                {/* Inline Validation Error */}
+                {inlineValidationError && (
+                  <div className="text-xs text-[var(--danger)] font-sans pt-1">
+                    {inlineValidationError}
+                  </div>
+                )}
+              </div>
+
+              {/* Drop Strip (NOT a dashed box) */}
+              <div
+                onDragEnter={handleDragOver}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={`w-full py-6 border-t border-[var(--border-soft)] text-xs text-[var(--text-muted)] font-sans cursor-pointer transition-colors ${isDragOver ? "bg-[var(--bg-raise)] text-[var(--text)]" : ""
+                  }`}
+              >
+                Or drop a PDF anywhere on this page.
+              </div>
+            </section>
+
+            {/* RECENTLY REVIEWED SECTION */}
+            <section className="space-y-6">
+              <div>
+                <h2 className="font-serif text-2xl font-medium text-[var(--text)]">
+                  Recently reviewed
+                </h2>
+                <p className="font-sans text-sm text-[var(--text-muted)] mt-1">
+                  Sample reports — select one to view the full screening report.
+                </p>
+              </div>
+
+              <div className="divide-y divide-[var(--border-soft)] border-t border-b border-[var(--border-soft)]">
+                {/* Sample 1 */}
+                <button
+                  type="button"
+                  onClick={handleSampleClick}
+                  className="w-full text-left py-4 flex justify-between items-center group relative hover:pl-3 transition-all cursor-pointer"
+                >
+                  <div className="space-y-1">
+                    <div className="font-serif text-[19px] font-medium text-[var(--text)] group-hover:text-[var(--accent)] transition-colors">
+                      Latent Drift: Measuring Representation Instability in Fine-Tuned Language Models
+                    </div>
+                    <div className="font-sans text-sm text-[var(--text-muted)]">
+                      EMNLP 2025 — Kowalski, Menon, Subramaniam, Álvarez
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0 ml-4">
+                    <div className="font-serif italic text-sm text-[var(--warn)]">
+                      Moderate
+                    </div>
+                    <div className="font-sans text-xs text-[var(--text-faint)] mt-0.5">
+                      2 minutes ago
+                    </div>
+                  </div>
+                </button>
+
+                {/* Sample 2 */}
+                <button
+                  type="button"
+                  onClick={handleSampleClick}
+                  className="w-full text-left py-4 flex justify-between items-center group relative hover:pl-3 transition-all cursor-pointer"
+                >
+                  <div className="space-y-1">
+                    <div className="font-serif text-[19px] font-medium text-[var(--text)] group-hover:text-[var(--accent)] transition-colors">
+                      Photocatalytic Efficiency of Doped TiO₂ Nanostructures Under Visible Light
+                    </div>
+                    <div className="font-sans text-sm text-[var(--text-muted)]">
+                      Journal of Materials Chemistry — 3 authors
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0 ml-4">
+                    <div className="font-serif italic text-sm text-[var(--good)]">
+                      Low
+                    </div>
+                    <div className="font-sans text-xs text-[var(--text-faint)] mt-0.5">
+                      1 hour ago
+                    </div>
+                  </div>
+                </button>
+
+                {/* Sample 3 */}
+                <button
+                  type="button"
+                  onClick={handleSampleClick}
+                  className="w-full text-left py-4 flex justify-between items-center group relative hover:pl-3 transition-all cursor-pointer"
+                >
+                  <div className="space-y-1">
+                    <div className="font-serif text-[19px] font-medium text-[var(--text)] group-hover:text-[var(--accent)] transition-colors">
+                      Early Markers of Cognitive Decline in Longitudinal Cohort Studies
+                    </div>
+                    <div className="font-sans text-sm text-[var(--text-muted)]">
+                      Preprint — 6 authors
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0 ml-4">
+                    <div className="font-serif italic text-sm text-[var(--danger)]">
+                      Needs review
+                    </div>
+                    <div className="font-sans text-xs text-[var(--text-faint)] mt-0.5">
+                      Yesterday
+                    </div>
+                  </div>
+                </button>
+              </div>
+            </section>
+
+            {/* HOW A REPORT GETS MADE */}
+            <section className="space-y-6">
+              <h2 className="font-serif text-2xl font-medium text-[var(--text)]">
+                How a report gets made
+              </h2>
+
+              <div className="space-y-4 max-w-[60ch] font-sans text-[15.5px] leading-relaxed text-[var(--text-muted)]">
+                <p>
+                  <span className="font-serif italic text-[var(--text)] mr-1">First,</span>
+                  the PDF is parsed for text, structure, and layout, and its metadata is checked against Crossref and OpenAlex for a matching record.
+                </p>
+                <p>
+                  <span className="font-serif italic text-[var(--text)] mr-1">Then,</span>
+                  each reference is resolved against public indexes, and the abstract, body, and figures are compared for internal consistency.
+                </p>
+                <p>
+                  <span className="font-serif italic text-[var(--text)] mr-1">Finally,</span>
+                  everything is compiled into one report — with risk, confidence, and modules shown as separate, distinct measures.
+                </p>
+              </div>
+            </section>
+          </div>
+        )}
+
+        {/* PROGRESS VIEW */}
+        {viewState === "progress" && (
+          <div className="container-text py-16">
+            <AnalysisProgress
+              file={selectedFile}
+              isMock={isMockMode}
+              onComplete={handleAnalysisComplete}
+              onError={handleAnalysisError}
+            />
+          </div>
+        )}
+
+        {/* REPORT VIEW */}
+        {viewState === "report" && reportData && (
+          <div className="container-wide py-8">
+            <ReportDashboard
+              data={reportData}
+              isMock={isMockMode}
+              onBack={handleReset}
+              onReset={handleReset}
+            />
+          </div>
+        )}
+
+        {/* ERROR VIEW */}
+        {viewState === "error" && (
+          <div className="container-text py-16">
+            <AnalysisError message={errorMessage} onRetry={handleReset} />
+          </div>
+        )}
       </main>
 
-      <footer className="mx-auto w-full max-w-5xl border-t border-zinc-200 px-6 py-6 text-center text-xs text-zinc-400 dark:border-zinc-800">
-        Screening signals only, not proof of misconduct.
+      {/* FOOTER */}
+      <footer className="w-full border-t border-[var(--border)] py-6 mt-16">
+        <div className="container-wide flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 text-xs text-[var(--text-muted)] font-sans">
+          <div>© 2026 VeriScholar. A design prototype.</div>
+          <div className="max-w-[38ch] sm:text-right leading-relaxed">
+            VeriScholar surfaces screening signals — it does not determine or prove research misconduct.
+          </div>
+        </div>
       </footer>
     </div>
   );

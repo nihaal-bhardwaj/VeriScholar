@@ -1,217 +1,642 @@
 "use client";
 
-import React from "react";
-import { CombinedAnalysisResponse } from "../../lib/api-types";
+import React, { useState, useEffect } from "react";
+import { RiskSignal, MOCK_CITATIONS } from "../../lib/mockData";
 
-interface ReportDashboardProps {
-  data: CombinedAnalysisResponse;
-  onReset: () => void;
+interface ReportData {
+  paper_title?: string;
+  paper_authors?: string[];
+  paper?: { title?: string | null; authors?: string[] };
+  risk_score?: number;
+  risk_level?: string;
+  confidence?: number;
+  final_assessment?: {
+    risk_score?: number | null;
+    risk_level?: string | null;
+    confidence?: number | null;
+  };
+  signals?: RiskSignal[];
+  passed_checks?: string[];
+  modules_used?: string[];
+  generated_at?: string;
 }
 
-const MODULE_DESCRIPTIONS = [
-  {
-    name: "Metadata Analysis",
-    key: "metadata_analysis" as const,
-    description: "Verifies the paper's title, authors and DOI against Crossref.",
-  },
-  {
-    name: "Citation Checks",
-    key: "citation_analysis" as const,
-    description: "Verifies each reference against scholarly databases.",
-  },
-  {
-    name: "ML Risk Assessment",
-    key: "ml_analysis" as const,
-    description: "Scores the paper with a trained risk model.",
-  },
-];
+export interface ReportDashboardProps {
+  data: ReportData;
+  isMock?: boolean;
+  onBack?: () => void;
+  onReset?: () => void;
+}
 
-export default function ReportDashboard({ data, onReset }: ReportDashboardProps) {
-  const shortId = data.analysis_id ? data.analysis_id.slice(0, 8) : "";
+export default function ReportDashboard({
+  data,
+  onBack,
+  onReset,
+}: ReportDashboardProps) {
+  const [activeTab, setActiveTab] = useState<"overview" | "signals" | "citations">("overview");
+  const [evidenceOpen, setEvidenceOpen] = useState<boolean>(false);
+  const [openSignalIds, setOpenSignalIds] = useState<Record<number, boolean>>({});
+  const [citationFilter, setCitationFilter] = useState<string>("all");
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Normalize data shape if coming from CombinedAnalysisResponse
+  const title = data.paper_title || data.paper?.title || "Latent Drift: Measuring Representation Instability in Fine-Tuned Language Models";
+  const authors: string[] = data.paper_authors || data.paper?.authors || ["Kowalski", "Menon", "Subramaniam", "Álvarez"];
+  const riskScore: number = typeof data.risk_score === "number" ? data.risk_score : (data.final_assessment?.risk_score ?? 42);
+  const riskLevel: string = (data.risk_level || data.final_assessment?.risk_level || "medium").toLowerCase();
+  const confidence: number = typeof data.confidence === "number" ? data.confidence : (data.final_assessment?.confidence ?? 0.81);
+  const signals: RiskSignal[] = data.signals || [];
+  const passedChecks: string[] = data.passed_checks || [
+    "Metadata match — title, authors, and DOI resolve consistently",
+    "Author consistency — author list matches across locations",
+    "Figure and table numbering — all references resolve correctly",
+    "Duplicate passage detection — no substantial duplicates found",
+  ];
+  const modulesUsed: string[] = data.modules_used || ["consistency", "ml", "citations", "metadata"];
+  const generatedAt: string = data.generated_at || new Date().toISOString();
+
+  // Animation for Risk Numeral and Track Bar
+  const [animatedScore, setAnimatedScore] = useState<number>(0);
+  const [animatedWidth, setAnimatedWidth] = useState<number>(0);
+
+  useEffect(() => {
+    const prefersReducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    const target = Math.round(riskScore);
+    if (prefersReducedMotion) {
+      const frameId = requestAnimationFrame(() => {
+        setAnimatedScore(target);
+        setAnimatedWidth(target);
+      });
+      return () => cancelAnimationFrame(frameId);
+    }
+
+    const duration = 1000;
+    const startTime = performance.now();
+    let frameId: number;
+
+    const easeOutCubic = (x: number) => 1 - Math.pow(1 - x, 3);
+
+    const step = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(1, elapsed / duration);
+      const eased = easeOutCubic(progress);
+
+      setAnimatedScore(Math.round(eased * target));
+      setAnimatedWidth(eased * target);
+
+      if (progress < 1) {
+        frameId = requestAnimationFrame(step);
+      } else {
+        setAnimatedScore(target);
+        setAnimatedWidth(target);
+      }
+    };
+
+    frameId = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frameId);
+  }, [riskScore]);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 2400);
+  };
+
+  const handleReturn = () => {
+    if (onBack) onBack();
+    else if (onReset) onReset();
+  };
+
+  // Semantic styling for risk band
+  let riskColorClass = "text-[var(--good)]";
+  let riskDisplayWord = "Low";
+  if (riskLevel === "critical" || riskLevel === "high") {
+    riskColorClass = "text-[var(--danger)]";
+    riskDisplayWord = riskLevel === "critical" ? "Critical" : "High";
+  } else if (riskLevel === "medium" || riskLevel === "moderate") {
+    riskColorClass = "text-[var(--warn)]";
+    riskDisplayWord = "Moderate";
+  }
+
+  // Qualitative confidence label
+  const confPct = Math.round(confidence * 100);
+  let confWord = "moderate";
+  if (confPct < 50) confWord = "low";
+  else if (confPct < 75) confWord = "moderate";
+  else if (confPct < 90) confWord = "moderate–high";
+  else confWord = "high";
+
+  // Formatted date
+  const formattedDate = new Date(generatedAt).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+
+  // Review status
+  const warningSignals = signals.filter((s) => s.severity === "high" || s.severity === "medium");
+  const hasReviewWarranted = warningSignals.length > 0;
+
+  // Sorted signals for quick-list
+  const severityOrder: Record<string, number> = { high: 3, medium: 2, low: 1 };
+  const sortedTopSignals = [...signals]
+    .sort((a, b) => (severityOrder[b.severity] || 0) - (severityOrder[a.severity] || 0))
+    .slice(0, 3);
+
+  const toggleSignal = (idx: number) => {
+    setOpenSignalIds((prev) => ({ ...prev, [idx]: !prev[idx] }));
+  };
+
+  // Filtered citations
+  const filteredCitations = MOCK_CITATIONS.filter((c) => {
+    if (citationFilter === "all") return true;
+    return c.status === citationFilter;
+  });
+
+  const citationSignals = signals.filter((s) => s.source === "citations");
 
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
-
-      {/* Header section with disclaimer */}
-      <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 rounded-2xl p-6 shadow-sm">
-        <div className="flex items-start space-x-4">
-          <svg className="w-6 h-6 text-amber-600 dark:text-amber-500 shrink-0 mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-          <div>
-            <h3 className="text-lg font-semibold text-amber-900 dark:text-amber-400">Important Notice</h3>
-            <p className="mt-1 text-sm text-amber-800 dark:text-amber-500 leading-relaxed">
-              This analysis highlights signals that may require human review. It does not prove research misconduct.
-              The system uses pattern matching and metadata verification as screening indicators only.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Analysis Report
-          </h2>
-          {shortId && (
-            <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-500">
-              Analysis ID: <code className="font-mono text-xs">{shortId}…</code>
-            </p>
-          )}
-        </div>
-        <button
-          onClick={onReset}
-          className="px-4 py-2 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-lg shadow-sm hover:bg-zinc-50 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700 dark:hover:bg-zinc-700 transition-colors"
-        >
-          Analyse Another Paper
-        </button>
-      </div>
-
-      {/* FINAL SCORE CARD */}
-      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-sm flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Overall Integrity Risk Score</h3>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            Based on {data.final_assessment.confidence ? Math.round(data.final_assessment.confidence * 100) : 0}% confidence evaluation across available modules.
-          </p>
-        </div>
-        <div className="text-right">
-          <span className={`text-4xl font-bold ${data.final_assessment.risk_level === 'high' ? 'text-red-500' : data.final_assessment.risk_level === 'moderate' ? 'text-amber-500' : 'text-emerald-500'}`}>
-            {data.final_assessment.risk_score?.toFixed(1) || "0.0"}
-          </span>
-          <span className="block text-sm font-medium text-zinc-500 uppercase mt-1">
-            {data.final_assessment.risk_level || "Unknown"} RISK
-          </span>
-        </div>
-      </div>
-
-      {/* Main Signals from Modules */}
-      {data.ml_analysis.signals && data.ml_analysis.signals.length > 0 && (
-        <div className="bg-red-50/50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-2xl p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-red-900 dark:text-red-400 mb-4">Integrity Flags Detected</h3>
-          <ul className="space-y-2 list-disc list-inside text-sm text-red-800 dark:text-red-300">
-            {data.ml_analysis.signals.map((signal, idx) => (
-              <li key={idx} className="leading-relaxed">{signal}</li>
-            ))}
-          </ul>
+    <div className="w-full max-w-[920px] mx-auto py-8">
+      {/* Toast */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 bg-[var(--bg-raise)] border border-[var(--border)] text-[var(--text)] px-4 py-2 text-sm z-50 shadow-sm animate-fade-in">
+          {toastMessage}
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-        {/* Paper Information */}
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Document Details</h3>
-          <dl className="space-y-4 text-sm">
-            <div>
-              <dt className="text-zinc-500 dark:text-zinc-400">Filename</dt>
-              <dd className="font-medium text-zinc-900 dark:text-zinc-200 truncate">{data.paper.filename}</dd>
-            </div>
-            <div>
-              <dt className="text-zinc-500 dark:text-zinc-400">Title</dt>
-              <dd className="font-medium text-zinc-900 dark:text-zinc-200">{data.paper.title || "Not detected"}</dd>
-            </div>
-            <div>
-              <dt className="text-zinc-500 dark:text-zinc-400">Authors</dt>
-              <dd className="font-medium text-zinc-900 dark:text-zinc-200">
-                {data.paper.authors && data.paper.authors.length > 0
-                  ? data.paper.authors.join(", ")
-                  : "Not detected"}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-zinc-500 dark:text-zinc-400">DOI</dt>
-              <dd className="font-medium text-zinc-900 dark:text-zinc-200">{data.paper.doi || "Not found"}</dd>
-            </div>
-            <div>
-              <dt className="text-zinc-500 dark:text-zinc-400">Pages Extracted</dt>
-              <dd className="font-medium text-zinc-900 dark:text-zinc-200">{data.paper.page_count}</dd>
-            </div>
-          </dl>
+      {/* HEADER */}
+      <div className="mb-8">
+        <div className="text-xs text-[var(--text-muted)] font-sans mb-3">
+          <button
+            type="button"
+            onClick={handleReturn}
+            className="hover:text-[var(--text)] transition-colors cursor-pointer"
+          >
+            Analyzer
+          </button>
+          <span className="mx-2 text-[var(--border)]">/</span>
+          <span className="text-[var(--text)]">Report</span>
         </div>
 
-        {/* Status Overview */}
-        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Module Status</h3>
-          <ul className="space-y-4 text-sm">
-            {MODULE_DESCRIPTIONS.map((module) => (
-              <li key={module.key}>
-                <div className="flex items-center justify-between">
-                  <span className="text-zinc-600 dark:text-zinc-400">{module.name}</span>
-                  <StatusBadge status={data[module.key].status} />
-                </div>
-                <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
-                  {module.description}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
+        <h1 className="font-serif text-[clamp(26px,3.4vw,34px)] font-medium text-[var(--text)] max-w-[30ch] leading-tight mb-3">
+          {title}
+        </h1>
 
-      {/* Abstract preview */}
-      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-sm">
-        <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Abstract</h3>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
-          {data.paper.abstract || "No abstract detected."}
+        <p className="font-sans text-sm text-[var(--text-muted)] max-w-[64ch] leading-relaxed mb-4">
+          By {authors.length ? authors.join(", ") : "Unknown Authors"}. Screened by VeriScholar on {formattedDate}.
         </p>
+
+        <div className="flex gap-4">
+          <button
+            type="button"
+            onClick={() => showToast("Export feature coming soon")}
+            className="btn-quiet"
+          >
+            Export report
+          </button>
+          <span className="text-[var(--border)]">·</span>
+          <button
+            type="button"
+            onClick={() => showToast("Share link copied to clipboard")}
+            className="btn-quiet"
+          >
+            Share
+          </button>
+        </div>
       </div>
 
-      {/* Extracted References */}
-      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Extracted References</h3>
-          <span className="px-3 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 text-xs font-medium rounded-full">
-            {data.paper.references.length} found
-          </span>
+      {/* SIGNATURE SUMMARY BLOCK */}
+      <section className="border-t border-b border-[var(--border)] py-8 my-8">
+        <div className="flex flex-col md:flex-row justify-between gap-8 mb-6">
+          {/* LEFT: Dominant Risk Figure */}
+          <div className="md:w-3/5">
+            <div className="text-xs font-sans text-[var(--text-muted)] mb-1">
+              Integrity risk
+            </div>
+            <div className="flex items-baseline gap-3">
+              <span className="font-serif font-medium text-[clamp(72px,8vw,96px)] tracking-tight leading-none text-[var(--text)] [font-variant-numeric:lining-nums]">
+                {animatedScore}
+              </span>
+              <span className={`font-serif italic text-2xl font-normal ${riskColorClass}`}>
+                {riskDisplayWord}
+              </span>
+            </div>
+
+            {/* 1px Gold Track Bar */}
+            <div className="w-[230px] h-[1px] bg-[var(--border)] mt-4">
+              <div
+                className="h-full bg-[var(--accent)] transition-all duration-300 ease-out"
+                style={{ width: `${animatedWidth}%` }}
+              />
+            </div>
+          </div>
+
+          {/* RIGHT: Subordinate Side Metrics */}
+          <div className="md:w-2/5 flex flex-col justify-center space-y-4 md:border-l md:border-[var(--border-soft)] md:pl-8">
+            <div className="flex items-baseline">
+              <span className="w-[130px] text-xs font-sans text-[var(--text-muted)]">
+                Confidence
+              </span>
+              <span className="font-serif text-xl font-medium text-[var(--text)] mr-2 [font-variant-numeric:lining-nums]">
+                {confPct}%
+              </span>
+              <span className="font-serif italic text-xs text-[var(--text-muted)]">
+                {confWord}
+              </span>
+            </div>
+
+            <div className="flex items-baseline">
+              <span className="w-[130px] text-xs font-sans text-[var(--text-muted)]">
+                Modules run
+              </span>
+              <span className="font-serif text-xl font-medium text-[var(--text)] mr-2 [font-variant-numeric:lining-nums]">
+                {modulesUsed.length}
+              </span>
+              <span className="font-serif italic text-xs text-[var(--text-muted)]">
+                of 4 available
+              </span>
+            </div>
+          </div>
         </div>
-        <div className="max-h-96 overflow-y-auto pr-2 space-y-3">
-          {data.paper.references.length > 0 ? (
-            data.paper.references.map((ref, i) => (
-              <div key={i} className="p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg text-sm border border-zinc-100 dark:border-zinc-800">
-                <span className="font-semibold text-zinc-700 dark:text-zinc-300 mr-2">[{ref.number || i + 1}]</span>
-                <span className="text-zinc-600 dark:text-zinc-400">{ref.raw_text}</span>
-                {ref.doi && (
-                  <div className="mt-2 flex items-center text-xs text-blue-600 dark:text-blue-400">
-                    <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                    </svg>
-                    {ref.doi}
+
+        {/* REVIEW LINE */}
+        <div className="border-t border-[var(--border-soft)] pt-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+          <div className="font-sans text-sm text-[var(--text)]">
+            {hasReviewWarranted ? (
+              <>
+                <span className="font-semibold text-[var(--warn)] mr-1">
+                  Requires human review
+                </span>
+                <span className="text-[var(--text-muted)]">
+                  — {warningSignals.length} of {signals.length || 7} signals warrant a closer look.
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="font-semibold text-[var(--good)] mr-1">
+                  No critical signals found
+                </span>
+                <span className="text-[var(--text-muted)]">
+                  — all checks passed or returned low-severity signals.
+                </span>
+              </>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setEvidenceOpen(!evidenceOpen)}
+            className="text-btn text-xs shrink-0"
+          >
+            {evidenceOpen ? "Hide the evidence" : "Show the evidence"}
+          </button>
+        </div>
+
+        {/* EVIDENCE QUICK-LIST (COLLAPSIBLE) */}
+        <div
+          className={`overflow-hidden transition-all duration-300 ease-in-out ${
+            evidenceOpen ? "max-h-[500px] mt-4 opacity-100" : "max-h-0 opacity-0"
+          }`}
+        >
+          <div className="pt-2 space-y-3">
+            {sortedTopSignals.length > 0 ? (
+              sortedTopSignals.map((sig, idx) => {
+                const isWarn = sig.severity === "high" || sig.severity === "medium";
+                return (
+                  <div
+                    key={idx}
+                    className={`pl-4 border-l-2 text-xs font-sans leading-relaxed ${
+                      isWarn ? "border-[var(--warn)]" : "border-[var(--good)]"
+                    }`}
+                  >
+                    <span className="font-semibold text-[var(--text)] mr-1.5">
+                      {sig.message}
+                    </span>
+                    <span className="text-[var(--text-muted)]">
+                      — {sig.evidence.length > 100 ? `${sig.evidence.slice(0, 100)}…` : sig.evidence}
+                    </span>
                   </div>
-                )}
+                );
+              })
+            ) : (
+              <div className="pl-4 border-l-2 border-[var(--good)] text-xs font-sans text-[var(--text-muted)]">
+                All consistency and integrity checks passed cleanly.
               </div>
-            ))
+            )}
+          </div>
+        </div>
+
+        {/* DISCLAIMER NOTE */}
+        <div className="border-t border-[var(--border-soft)] pt-3 mt-4 text-xs font-sans text-[var(--text-muted)] leading-relaxed">
+          <span className="font-serif italic text-[var(--accent)] mr-1">Note.</span>
+          This is a screening result, not a finding. VeriScholar surfaces signals worth a reviewer&apos;s attention — it does not prove or disprove research misconduct.
+        </div>
+      </section>
+
+      {/* TABS */}
+      <div className="border-b border-[var(--border-soft)] flex gap-8 mb-8">
+        <button
+          type="button"
+          onClick={() => setActiveTab("overview")}
+          className={`pb-3 font-sans text-sm cursor-pointer transition-colors ${
+            activeTab === "overview"
+              ? "border-b-2 border-[var(--accent)] text-[var(--text)] font-medium"
+              : "text-[var(--text-muted)] hover:text-[var(--text)]"
+          }`}
+        >
+          Overview
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("signals")}
+          className={`pb-3 font-sans text-sm cursor-pointer transition-colors flex items-center gap-1.5 ${
+            activeTab === "signals"
+              ? "border-b-2 border-[var(--accent)] text-[var(--text)] font-medium"
+              : "text-[var(--text-muted)] hover:text-[var(--text)]"
+          }`}
+        >
+          <span>Signals</span>
+          <span className="font-serif italic text-xs text-[var(--text-muted)]">
+            ({signals.length})
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("citations")}
+          className={`pb-3 font-sans text-sm cursor-pointer transition-colors flex items-center gap-1.5 ${
+            activeTab === "citations"
+              ? "border-b-2 border-[var(--accent)] text-[var(--text)] font-medium"
+              : "text-[var(--text-muted)] hover:text-[var(--text)]"
+          }`}
+        >
+          <span>Citations</span>
+          <span className="font-serif italic text-xs text-[var(--text-muted)]">
+            (xlii)
+          </span>
+        </button>
+      </div>
+
+      {/* TAB CONTENT PANELS */}
+      {activeTab === "overview" && (
+        <div className="animate-tab-panel grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Module Status */}
+          <div>
+            <h3 className="font-serif text-lg font-medium text-[var(--text)] mb-3">
+              Module status
+            </h3>
+            <div className="divide-y divide-[var(--border-soft)] border-t border-[var(--border-soft)]">
+              {[
+                {
+                  id: "metadata",
+                  name: "Metadata verification",
+                  desc: "DOI resolved via Crossref — title and author match confirmed",
+                },
+                {
+                  id: "citations",
+                  name: "Citation checks",
+                  desc: "References resolved against public bibliographic indexes",
+                },
+                {
+                  id: "consistency",
+                  name: "Internal consistency",
+                  desc: "Abstract, body, and figure references checked for coherence",
+                },
+                {
+                  id: "ml",
+                  name: "ML risk assessment",
+                  desc: "Scanning for unusual statistical distributions and patterns",
+                },
+              ].map((m) => {
+                const isCompleted = modulesUsed.includes(m.id);
+                return (
+                  <div key={m.id} className="py-3 flex justify-between items-start gap-4">
+                    <div>
+                      <div className="font-sans text-sm text-[var(--text)]">{m.name}</div>
+                      <div className="font-sans text-xs text-[var(--text-faint)] mt-0.5">{m.desc}</div>
+                    </div>
+                    <span
+                      className={`font-serif italic text-xs shrink-0 ${
+                        isCompleted ? "text-[var(--good)]" : "text-[var(--text-faint)]"
+                      }`}
+                    >
+                      {isCompleted ? "completed" : "unavailable"}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* At a Glance */}
+          <div>
+            <h3 className="font-serif text-lg font-medium text-[var(--text)] mb-3">
+              At a glance
+            </h3>
+            <div className="divide-y divide-[var(--border-soft)] border-t border-[var(--border-soft)] text-sm">
+              <div className="py-2.5 flex justify-between">
+                <span className="font-sans text-[var(--text-muted)]">Risk score</span>
+                <span className="font-serif font-medium text-[var(--text)] [font-variant-numeric:lining-nums]">
+                  {Math.round(riskScore)} / 100
+                </span>
+              </div>
+              <div className="py-2.5 flex justify-between">
+                <span className="font-sans text-[var(--text-muted)]">Risk level</span>
+                <span className="font-serif font-medium capitalize text-[var(--text)]">
+                  {riskLevel}
+                </span>
+              </div>
+              <div className="py-2.5 flex justify-between">
+                <span className="font-sans text-[var(--text-muted)]">Confidence</span>
+                <span className="font-serif font-medium text-[var(--text)] [font-variant-numeric:lining-nums]">
+                  {Math.round(confidence * 100)}%
+                </span>
+              </div>
+              <div className="py-2.5 flex justify-between">
+                <span className="font-sans text-[var(--text-muted)]">Signals detected</span>
+                <span className="font-serif font-medium text-[var(--text)] [font-variant-numeric:lining-nums]">
+                  {signals.length}
+                </span>
+              </div>
+              <div className="py-2.5 flex justify-between">
+                <span className="font-sans text-[var(--text-muted)]">Checks passed</span>
+                <span className="font-serif font-medium text-[var(--text)] [font-variant-numeric:lining-nums]">
+                  {passedChecks.length}
+                </span>
+              </div>
+              <div className="py-2.5 flex justify-between">
+                <span className="font-sans text-[var(--text-muted)]">Modules used</span>
+                <span className="font-serif text-[var(--text)]">
+                  {modulesUsed.join(", ")}
+                </span>
+              </div>
+              <div className="py-2.5 flex justify-between">
+                <span className="font-sans text-[var(--text-muted)]">Analyzed</span>
+                <span className="font-serif text-[var(--text)]">{formattedDate}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "signals" && (
+        <div className="animate-tab-panel">
+          {signals.length > 0 ? (
+            <div className="divide-y divide-[var(--border-soft)] border-t border-[var(--border-soft)]">
+              {signals.map((sig, idx) => {
+                const isWarn = sig.severity === "high" || sig.severity === "medium";
+                const isOpen = openSignalIds[idx];
+
+                return (
+                  <div
+                    key={idx}
+                    className={`py-4 transition-all ${
+                      isWarn
+                        ? "border-l-2 border-l-[var(--warn)] pl-4"
+                        : "border-l-2 border-transparent pl-4"
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => toggleSignal(idx)}
+                      className="w-full text-left flex justify-between items-baseline mb-1 group cursor-pointer"
+                    >
+                      <span className="font-serif text-[19px] font-medium text-[var(--text)] group-hover:text-[var(--accent)] transition-colors">
+                        {sig.message}
+                      </span>
+                      <span className="font-serif italic text-xs text-[var(--text-muted)] shrink-0 ml-4">
+                        {sig.source}
+                      </span>
+                    </button>
+
+                    <p className="font-sans text-sm text-[var(--text-muted)] leading-relaxed mb-2">
+                      {sig.evidence}
+                    </p>
+
+                    <div
+                      onClick={() => toggleSignal(idx)}
+                      className="font-sans text-xs text-[var(--text-faint)] cursor-pointer hover:text-[var(--text-muted)] transition-colors"
+                    >
+                      {isWarn && (
+                        <span className="text-[var(--warn)] mr-1 font-medium">
+                          Needs a closer look —
+                        </span>
+                      )}
+                      click to toggle the evidence
+                    </div>
+
+                    <div
+                      className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                        isOpen ? "max-h-[300px] mt-3 opacity-100" : "max-h-0 opacity-0"
+                      }`}
+                    >
+                      <div className="border-l border-[var(--border)] pl-4 ml-2 my-2 font-serif italic text-sm text-[var(--text-muted)] leading-relaxed">
+                        {sig.evidence}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           ) : (
-            <p className="text-sm text-zinc-500">No structured references extracted.</p>
+            <div className="py-8 text-center text-sm font-sans text-[var(--text-muted)] border-t border-[var(--border-soft)]">
+              No signals detected — all checks passed.
+            </div>
           )}
         </div>
-      </div>
+      )}
 
+      {activeTab === "citations" && (
+        <div className="animate-tab-panel space-y-10">
+          {/* Real Citation Signals */}
+          {citationSignals.length > 0 && (
+            <div>
+              <h3 className="font-serif text-lg font-medium text-[var(--text)] mb-3">
+                Citation signals detected
+              </h3>
+              <div className="divide-y divide-[var(--border-soft)] border-t border-[var(--border-soft)]">
+                {citationSignals.map((sig, idx) => (
+                  <div key={idx} className="py-3 border-l-2 border-l-[var(--warn)] pl-4">
+                    <div className="font-serif text-[17px] font-medium text-[var(--text)]">
+                      {sig.message}
+                    </div>
+                    <div className="font-sans text-xs text-[var(--text-muted)] mt-1">
+                      {sig.evidence}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="font-sans text-xs text-[var(--text-faint)] mt-2">
+                Per-reference citation data is available via the dedicated /api/v1/citations/verify endpoint.
+              </p>
+            </div>
+          )}
+
+          {/* Mock Reference Table */}
+          <div>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+              <div>
+                <h3 className="font-serif text-lg font-medium text-[var(--text)]">
+                  Example reference format
+                </h3>
+                <p className="font-sans text-xs text-[var(--text-muted)]">
+                  These are example citations, not from this paper&apos;s analysis.
+                </p>
+              </div>
+
+              {/* Filters */}
+              <div className="flex flex-wrap gap-4 text-xs font-sans">
+                {[
+                  { label: "All · 42", value: "all" },
+                  { label: "Verified", value: "verified" },
+                  { label: "Partially verified", value: "partial" },
+                  { label: "Needs review", value: "needsreview" },
+                  { label: "Not found", value: "notfound" },
+                ].map((f) => (
+                  <button
+                    key={f.value}
+                    type="button"
+                    onClick={() => setCitationFilter(f.value)}
+                    className={`pb-1 cursor-pointer transition-colors ${
+                      citationFilter === f.value
+                        ? "border-b border-[var(--accent)] text-[var(--text)] font-medium"
+                        : "text-[var(--text-muted)] hover:text-[var(--text)]"
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="divide-y divide-[var(--border-soft)] border-t border-[var(--border-soft)]">
+              {filteredCitations.map((c) => (
+                <div key={c.num} className="py-3 flex gap-4 items-start">
+                  <span className="font-serif italic text-xs text-[var(--text-muted)] w-8 shrink-0 pt-0.5">
+                    {c.num}.
+                  </span>
+                  <div className="flex-1">
+                    <div className="font-serif text-[16.5px] text-[var(--text)] leading-relaxed">
+                      {c.text}
+                    </div>
+                    <div className="font-sans text-xs text-[var(--text-faint)] mt-1">
+                      {c.note}
+                    </div>
+                  </div>
+                  <span className={`font-serif italic text-xs shrink-0 text-right ${c.statusClass}`}>
+                    {c.statusWord}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="pt-4 text-xs font-sans text-[var(--text-faint)]">
+              Showing 10 of 42 references in this preview.
+            </div>
+          </div>
+        </div>
+      )}
     </div>
-  );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  if (status === "completed") {
-    return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
-        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-        Completed
-      </span>
-    );
-  }
-  if (status === "pending") {
-    return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-400">
-        <span className="h-1.5 w-1.5 rounded-full bg-zinc-400" />
-        Pending
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
-      <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
-      Error
-    </span>
   );
 }

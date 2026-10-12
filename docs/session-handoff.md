@@ -117,6 +117,39 @@ Technical Lead, Backend & PDF Processing Engineer (repository-wide coordination)
 
 ---
 
+## 2026-10-12 — Technical Lead, Backend & PDF Processing Engineer
+
+### Role
+Technical Lead, Backend & PDF Processing Engineer
+
+### Work completed
+- Prepared the coordinated backend, ML, citation/review, frontend, and documentation changes for repository publication.
+- Fixed frontend lint and type-check issues in the analysis progress, landing, methodology, and report dashboard components.
+- Excluded the generated `sample-papers/test_paper.pdf` artifact from the commit.
+
+### Files changed
+- Existing pending changes across `backend/`, `frontend/`, `ml/`, `docs/`, and root configuration files.
+
+### Tests run
+- Backend: `python -m pytest -q` -> 284 passed, 1 existing Starlette deprecation warning.
+- Frontend: `npm run lint` -> passed with 1 existing font warning.
+- Frontend: `npm run build` -> passed.
+
+### Current state
+- Changes are verified and committed as `ce336f1`; push to `origin/main` is pending.
+
+### Next recommended task
+- Extract keywords/index terms and add parser regression coverage.
+
+### Dependencies or blockers
+- None.
+
+### Commit / push
+- Commit: `ce336f1`
+- Pushed to main: No
+
+---
+
 ## 2026-08-01 — Technical Lead, Backend & PDF Processing Engineer (Phases 6–7)
 
 ### Role
@@ -586,3 +619,96 @@ Research Paper ML & Dataset Engineer
 ### Commit / push
 - Commit: none (not requested)
 - Pushed to main: No
+
+---
+
+## Session Handoff — Fake Review Detector: AI-Powered Review Analysis with Groq (Llama 3.3 70B)
+
+### Member / role
+- Citation Integrity, Metadata Verification & Fake Review Engineer
+
+### Work completed
+- Setup:
+  - Added `groq>=0.9.0` to `backend/requirements.txt` and installed in Python 3.13 environment.
+  - Added `GROQ_API_KEY=your_groq_api_key_here` to `backend/.env.example` and root `.env.example`.
+  - Added `groq_api_key: str = ""` to `backend/app/core/config.py`.
+- LLM Review Analyzer Service (`backend/app/services/reviews/llm_analyzer.py`):
+  - Structured prompt with exact system, user, and fallback prompts matching specification.
+  - Model `llama-3.3-70b-versatile`, 10s request timeout, 1500 max character review text truncation.
+  - Safe error handling: never raises; returns `llm_available=False` with `fallback_reason` (`"timeout"`, `"api_error"`, `"not_configured"`, `"parse_error"`).
+  - Rate-limited batch function `analyze_reviews_batch_with_llm` with 0.2s inter-call delay.
+  - Sanitized logging without review text or API key exposure.
+- Pipeline Integration (`backend/app/services/reviews/review_report_generator.py`):
+  - Pre-filter: skips LLM if any heuristic signal is high severity or text has < 10 words. Calls LLM if heuristic signals are low/none or only medium severity.
+  - Score combination: LLM authenticity score (0-100) and classification replace heuristic scores when LLM succeeds; retains high-severity heuristic signals alongside converted LLM signals.
+  - Populates `analyzed_by` (`"llm"`, `"heuristics"`, `"llm+heuristics"`) and `reasoning`.
+- Frontend Integration:
+  - Updated `frontend/lib/review-types.ts` and `frontend/components/reviews/ReviewReportDashboard.tsx`.
+  - Displays subtle badges ("AI Analysis" / "Rule-based") on review cards and "AI Assessment:" section in the "Why?" drawer.
+- Unit Testing:
+  - Created `backend/tests/test_llm_analyzer.py` with 11 mocked unit tests covering success, retries, parse error, timeouts, api errors, missing configuration, pre-filtering heuristics, score overriding, and batch delay.
+
+### Files changed / created
+- Created: `backend/app/services/reviews/llm_analyzer.py`
+- Created: `backend/tests/test_llm_analyzer.py`
+- Modified: `backend/requirements.txt`, `backend/.env.example`, `.env.example`
+- Modified: `backend/app/core/config.py`
+- Modified: `backend/app/schemas/reviews.py`
+- Modified: `backend/app/services/reviews/review_report_generator.py`
+- Modified: `frontend/lib/review-types.ts`
+- Modified: `frontend/components/reviews/ReviewReportDashboard.tsx`
+- Modified: `docs/project-status.md`, `docs/session-handoff.md`
+
+### Tests run
+- `pytest tests/test_llm_analyzer.py` -> 11/11 passed in 0.50s
+- `pytest` full backend suite (Python 3.13) -> 275/275 passed in 21.72s (264 previous + 11 new)
+- `npm run build` in `frontend/` -> Next.js 16 (Turbopack) production build passed cleanly with zero type errors.
+
+### Commit / push
+- Commit: none (not requested)
+- Pushed to main: No
+
+---
+
+## Session Handoff — Fake Review Detector: Pre-Filter Fix, Incoherence Heuristic (Rule 8), and Score Inversion
+
+### Member / role
+- Citation Integrity, Metadata Verification & Fake Review Engineer
+
+### Work completed
+- Pre-Filter Gating Fix (`backend/app/services/reviews/review_report_generator.py`):
+  - Corrected `_should_call_llm()` logic to invoke Groq LLM on all reviews EXCEPT those with $\le 5$ words or those with high-severity duplicate catches (`duplicate_text` / `duplicate_or_near_duplicate_text`).
+  - Reviews with zero heuristic signals, low/medium signals, short-but-sufficient text (6-15 words), and non-duplicate high signals (such as category incoherence) now consistently route to LLM.
+- LLM Prompt Enhancement (`backend/app/services/reviews/llm_analyzer.py`):
+  - Updated User Prompt to detect: product feature incoherence, category confusion, mixed signal contradictions (positive language with 1-2 stars or vice versa), implausible causal chains, and nonsense text.
+  - Added strict scoring guideline: 0–10 for nonsensical, incoherent, or impossible claims.
+- Rule 8 Product Category Incoherence (`backend/app/services/reviews/review_analyzer.py`):
+  - Added heuristic check spanning 5 unrelated product categories (electronics, haircare, health/body, food/taste, clothing).
+  - Triggers `rule="product_category_incoherence"`, `severity="high"` when terms from 3 or more unrelated groups appear in the same review.
+- Score Conversion & Combination Alignment:
+  - Corrected inversion from LLM authenticity score (0=fake, 100=genuine) to suspicion score (`suspicion_score = 100 - llm_authenticity_score`), aligning with the system's suspicion-based scoring model.
+  - If high-severity heuristic signals are present, `final_score = max(llm_suspicion_score, heuristic_score)`, preventing LLMs from overriding definitive catches.
+  - `analyzed_by` set to `"llm+heuristics"` (or `"llm"`) to display `"AI Analysis"` in UI.
+- Unit Testing:
+  - Added 4 tests in `backend/tests/test_review_analyzer.py` for Rule 8 (27/27 passing).
+  - Added 5 new tests in `backend/tests/test_llm_analyzer.py` (16/16 passing) covering zero-signal routing, 4-word & 5-word skips, incoherence high signal calling LLM, score inversion ($10 \to 90$), and max score combination.
+
+### Files changed
+- Modified: `backend/app/services/reviews/llm_analyzer.py`
+- Modified: `backend/app/services/reviews/review_analyzer.py`
+- Modified: `backend/app/services/reviews/review_report_generator.py`
+- Modified: `backend/tests/test_review_analyzer.py`
+- Modified: `backend/tests/test_llm_analyzer.py`
+- Modified: `docs/project-status.md`, `docs/session-handoff.md`
+
+### Tests run
+- `pytest tests/test_llm_analyzer.py` -> 16/16 passed in 0.47s
+- `pytest tests/test_review_analyzer.py` -> 27/27 passed in 0.06s
+- `pytest` full backend suite (Python 3.13) -> 284/284 passed in 18.91s
+- `npm run build` in `frontend/` -> Next.js 16 (Turbopack) production build passed cleanly with zero type errors.
+
+### Commit / push
+- Commit: none (not requested)
+- Pushed to main: No
+
+

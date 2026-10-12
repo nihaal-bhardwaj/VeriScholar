@@ -25,9 +25,9 @@ export const uploadAndProcessPaper = async (
     const fullText = paper.pages.map((p: { text: string }) => p.text).join("\n");
 
     // 2. Parallel Module Execution
-    onProgress("Running ML Risk models & verifying Citations...");
+    onProgress("Running ML Risk models, verifying Citations & Metadata...");
 
-    const [citationRes, mlRes, integrityRes] = await Promise.all([
+    const [citationRes, mlRes, integrityRes, metadataRes] = await Promise.all([
       // Execute Citations
       fetch(`${API_URL}/citations/verify`, {
         method: "POST",
@@ -37,7 +37,7 @@ export const uploadAndProcessPaper = async (
           references: paper.references,
         }),
       })
-        .then(res => res.ok ? res.json() : { status: "failed", verified: 0, unresolved: 0, warnings: [] })
+        .then((res) => (res.ok ? res.json() : { status: "failed", verified: 0, unresolved: 0, warnings: [] }))
         .catch(() => ({ status: "failed", verified: 0, unresolved: 0, warnings: ["Network error"] })),
 
       // Execute ML Analysis
@@ -50,7 +50,7 @@ export const uploadAndProcessPaper = async (
           pages: paper.pages,
         }),
       })
-        .then(res => res.ok ? res.json() : { signals: [], passed_rules: [], ml_risk_contribution: 0, confidence: 0 })
+        .then((res) => (res.ok ? res.json() : { signals: [], passed_rules: [], ml_risk_contribution: 0, confidence: 0 }))
         .catch(() => ({ signals: [], passed_rules: [], ml_risk_contribution: 0, confidence: 0 })),
 
       // Execute Integrity Check
@@ -65,8 +65,21 @@ export const uploadAndProcessPaper = async (
           pages: paper.pages,
         }),
       })
-        .then(res => res.ok ? res.json() : { flags: [], warnings: [], passed_checks: [], consistency_score: 0 })
-        .catch(() => ({ flags: [], warnings: [], passed_checks: [], consistency_score: 0 }))
+        .then((res) => (res.ok ? res.json() : { flags: [], warnings: [], passed_checks: [], consistency_score: 0 }))
+        .catch(() => ({ flags: [], warnings: [], passed_checks: [], consistency_score: 0 })),
+
+      // Execute Metadata Verification
+      fetch(`${API_URL}/citations/metadata`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: paper.title,
+          authors: paper.authors,
+          doi: paper.doi,
+        }),
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .catch(() => null),
     ]);
 
     // 3. Generate Final Report
@@ -83,7 +96,9 @@ export const uploadAndProcessPaper = async (
         consistency_report: integrityRes,
         ml_results: mlRes,
         citation_results: citationRes,
-        metadata_results: null, // Still pending MVP Phase
+        metadata_results: null,
+        extraction_quality: paper.extraction_quality,
+        paper_metadata: metadataRes,
       }),
     });
     const finalReport = reportRes.ok ? await reportRes.json() : null;
@@ -91,13 +106,21 @@ export const uploadAndProcessPaper = async (
     // 4. Transform into UI Contract (CombinedAnalysisResponse)
     onProgress("Done.");
 
+    const isMetadataComplete =
+      Boolean(finalReport?.modules_used?.includes("metadata")) ||
+      Boolean(metadataRes && (metadataRes.matched || metadataRes.status === "verified"));
+
     return {
       analysis_id: extraction.analysis_id,
       status: "completed",
       paper: paper,
       metadata_analysis: {
-        status: "pending",
-        warnings: [],
+        status: isMetadataComplete
+          ? "completed"
+          : metadataRes?.status === "unavailable"
+          ? "failed"
+          : "pending",
+        warnings: metadataRes?.status === "unavailable" ? ["Metadata provider unreachable"] : [],
       },
       citation_analysis: {
         status: citationRes.status || "completed",
@@ -108,7 +131,10 @@ export const uploadAndProcessPaper = async (
       ml_analysis: {
         status: mlRes.confidence > 0 ? "completed" : "failed",
         risk_probability: mlRes.ml_risk_contribution || 0,
-        signals: mlRes.signals?.map((s: { severity: string, message: string }) => `${s.severity.toUpperCase()}: ${s.message}`) || [],
+        signals:
+          mlRes.signals?.map(
+            (s: { severity: string; message: string }) => `${s.severity.toUpperCase()}: ${s.message}`
+          ) || [],
         warnings: [],
       },
       consistency_analysis: {
@@ -119,8 +145,13 @@ export const uploadAndProcessPaper = async (
         risk_score: finalReport?.risk_score || 0,
         risk_level: finalReport?.risk_level || "low",
         confidence: finalReport?.confidence || 0,
+        assessment_status: finalReport?.assessment_status || "evaluated",
         main_reasons: finalReport?.summary ? [finalReport.summary] : [],
+        modules_used: finalReport?.modules_used || [],
+        paper_metadata: finalReport?.paper_metadata || metadataRes,
       },
+      modules_used: finalReport?.modules_used || [],
+      paper_metadata: finalReport?.paper_metadata || metadataRes,
       warnings: extraction.warnings || [],
     };
 

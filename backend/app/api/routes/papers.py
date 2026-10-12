@@ -102,11 +102,19 @@ def extract_paper(file: UploadFile | None = File(default=None)) -> ExtractionRes
         doi=parsed.best_doi,
         doi_candidates=parsed.doi_candidates,
         abstract=parsed.abstract,
+        abstract_status=parsed.abstract_status,  # type: ignore[arg-type]
+        abstract_confidence=parsed.abstract_confidence,
         title=parsed.title,
+        title_confidence=parsed.title_confidence,
+        title_source=parsed.title_source,
         authors=parsed.authors,
+        author_confidence=parsed.author_confidence,
+        author_source=parsed.author_source,
         keywords=parsed.keywords,
         references_text=parsed.references_text,
         references=parsed.references,
+        reference_validation=parsed.reference_validation,  # type: ignore[arg-type]
+        extraction_quality=parsed.extraction_quality,  # type: ignore[arg-type]
         pages=parsed.pages,
     )
 

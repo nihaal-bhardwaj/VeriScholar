@@ -198,11 +198,11 @@ def extract_features(full_text: str, abstract: str, pages: list[dict]) -> TextFe
     abstract_words = {word.lower() for word in _words(abstract)}
     body_words = {word.lower() for word in words}
     if abstract_words and body_words:
-        abstract_to_body_similarity = len(abstract_words & body_words) / len(
-            abstract_words | body_words
+        abstract_to_body_similarity = round(
+            len(abstract_words & body_words) / min(len(abstract_words), len(body_words)), 4
         )
     else:
-        abstract_to_body_similarity = 0.0
+        abstract_to_body_similarity = None
 
     chunk_lengths = [
         _avg_sentence_length(" ".join(chunk))
@@ -236,7 +236,7 @@ def extract_features(full_text: str, abstract: str, pages: list[dict]) -> TextFe
         total_sentences=total_sentences,
         total_words=total_words,
         total_paragraphs=total_paragraphs,
-        abstract_to_body_similarity=round(abstract_to_body_similarity, 4),
+        abstract_to_body_similarity=abstract_to_body_similarity,
         section_style_variance=round(section_style_variance, 4),
         citation_density=round(citation_density, 4),
         passive_voice_ratio=round(passive_voice_ratio, 4),

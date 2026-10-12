@@ -43,15 +43,21 @@ def test_empty_text_returns_all_zeros():
     features = _features("", "")
 
     dumped = features.model_dump()
-    for value in dumped.values():
-        assert value == 0
+    for key, value in dumped.items():
+        if key == "abstract_to_body_similarity":
+            assert value is None
+        else:
+            assert value == 0
 
 
 def test_whitespace_only_text_returns_all_zeros():
     features = _features("   \n  \n  ", "   ")
 
-    for value in features.model_dump().values():
-        assert value == 0
+    for key, value in features.model_dump().items():
+        if key == "abstract_to_body_similarity":
+            assert value is None
+        else:
+            assert value == 0
 
 
 def test_sentence_length_variance_zero_for_single_sentence():
@@ -89,7 +95,7 @@ def test_abstract_body_similarity_is_one_when_identical():
 def test_abstract_body_similarity_is_zero_when_abstract_empty():
     features = _features("Some body text here.", abstract="")
 
-    assert features.abstract_to_body_similarity == 0.0
+    assert features.abstract_to_body_similarity is None
 
 
 # Citations

@@ -50,44 +50,65 @@ def _modules_used(data: ReportInput) -> list[str]:
         modules.append("consistency")
     if data.citation_results is not None:
         modules.append("citations")
-    if data.metadata_results is not None:
+    if (
+        data.metadata_results is not None
+        or data.paper_metadata is not None
+        or data.metadata_verification is not None
+    ):
         modules.append("metadata")
     if data.ml_results is not None:
         modules.append("ml")
     return modules
-
-
 def _confidence(data: ReportInput, modules: list[str]) -> float:
-    """Confidence in the report based on which modules contributed.
-
-    When only the ML module runs, the ML module's own confidence is used.
-    When both consistency and ML run, the two confidences are averaged and
-    capped at 0.85. Other combinations keep the generic module-count based
-    confidence.
-    """
+    """Confidence in the report based on modules and extraction quality."""
     if not modules:
         return 0.0
     if modules == ["ml"]:
-        return data.ml_results.confidence if data.ml_results is not None else 0.0
-    if "consistency" in modules and "ml" in modules:
+        base_conf = data.ml_results.confidence if data.ml_results is not None else 0.0
+    elif "consistency" in modules and "ml" in modules:
         consistency_conf = (
             data.consistency_report.consistency_score
             if data.consistency_report is not None
             else 0.0
         )
         ml_conf = data.ml_results.confidence if data.ml_results is not None else 0.0
-        return round(min(0.85, (consistency_conf + ml_conf) / 2), 2)
-    confidence = min(
-        _CONFIDENCE_BASE + _CONFIDENCE_PER_EXTRA_MODULE * (len(modules) - 1),
-        _MAX_CONFIDENCE,
-    )
-    if modules == ["consistency"]:
-        confidence = min(confidence, _MAX_CONFIDENCE_SINGLE_MODULE)
-    return round(confidence, 2)
+        base_conf = min(0.85, (consistency_conf + ml_conf) / 2)
+    else:
+        base_conf = min(
+            _CONFIDENCE_BASE + _CONFIDENCE_PER_EXTRA_MODULE * (len(modules) - 1),
+            _MAX_CONFIDENCE,
+        )
+        if modules == ["consistency"]:
+            base_conf = min(base_conf, _MAX_CONFIDENCE_SINGLE_MODULE)
+
+    # Factor in extraction quality if provided
+    if data.extraction_quality is not None:
+        q_status = data.extraction_quality.status
+        if q_status == "poor":
+            base_conf = min(base_conf, 0.30)
+        elif q_status == "degraded":
+            base_conf = min(base_conf, 0.55)
+
+    # Factor in metadata verification agreement (boosts confidence in identity)
+    meta = data.paper_metadata or data.metadata_results
+    if meta and meta.get("matched"):
+        base_conf = min(_MAX_CONFIDENCE, base_conf + 0.10)
+
+    return round(min(base_conf, _MAX_CONFIDENCE), 2)
 
 
-def _summary(score: float, level: str) -> str:
+def _summary(score: float, level: str, status: str = "evaluated") -> str:
     """Pick the human-readable summary template for the report."""
+    if status == "limited_evidence":
+        return (
+            "The document could not be fully parsed, so some integrity checks were not evaluable. "
+            "Available checks did not reveal conclusive integrity issues."
+        )
+    if status == "undetermined":
+        return (
+            "Document extraction quality was insufficient to perform reliable integrity screening. "
+            "Manual review of the original PDF is recommended."
+        )
     if score == 0.0:
         return _SUMMARIES["zero"]
     return _SUMMARIES[level]
@@ -147,11 +168,22 @@ def generate_report(data: ReportInput) -> RiskReport:
     score = round(min(score, _MAX_RISK_SCORE), 2)
 
     level = _risk_level(score)
+
+    # Determine assessment status based on extraction quality and score
+    assessment_status = "evaluated"
+    if data.extraction_quality is not None:
+        if data.extraction_quality.status == "poor":
+            assessment_status = "undetermined" if score < 40 else "limited_evidence"
+        elif data.extraction_quality.status == "degraded" and score < 40:
+            assessment_status = "limited_evidence"
+
     passed_checks: list[str] = []
     if data.consistency_report is not None:
         passed_checks.extend(data.consistency_report.passed_checks)
     if data.ml_results is not None:
         passed_checks.extend(data.ml_results.passed_rules)
+
+    meta = data.paper_metadata or data.metadata_verification or data.metadata_results
 
     return RiskReport(
         analysis_id=data.analysis_id,
@@ -160,9 +192,13 @@ def generate_report(data: ReportInput) -> RiskReport:
         risk_score=score,
         risk_level=level,
         confidence=_confidence(data, modules),
-        summary=_summary(score, level),
+        summary=_summary(score, level, assessment_status),
         signals=signals,
         passed_checks=passed_checks,
         modules_used=modules,
+        extraction_quality=data.extraction_quality,
+        assessment_status=assessment_status,
+        paper_metadata=meta,
+        metadata_verification=meta,
         generated_at=datetime.now(timezone.utc),
     )

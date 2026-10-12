@@ -9,6 +9,12 @@ export interface ExtractedPage {
   text: string;
 }
 
+export interface ExtractionQuality {
+  quality_score: number;
+  status: "good" | "degraded" | "poor";
+  issues: string[];
+}
+
 export interface PaperData {
   filename: string;
   file_size_bytes: number;
@@ -16,11 +22,18 @@ export interface PaperData {
   doi: string | null;
   doi_candidates: string[];
   abstract: string | null;
+  abstract_status?: "found" | "absent" | "uncertain";
+  abstract_confidence?: number | null;
   title: string | null;
+  title_confidence?: number | null;
+  title_source?: string | null;
   authors: string[];
+  author_confidence?: number | null;
+  author_source?: string | null;
   keywords: string[];
   references_text: string | null;
   references: Reference[];
+  extraction_quality?: ExtractionQuality | null;
   pages: ExtractedPage[];
 }
 
@@ -45,9 +58,12 @@ export type ConsistencyAnalysis = ModuleStatus;
 
 export interface FinalAssessment {
   risk_score: number | null;
-  risk_level: "low" | "moderate" | "high" | null;
+  risk_level: "low" | "moderate" | "medium" | "high" | "critical" | null;
   confidence: number | null;
+  assessment_status?: "evaluated" | "limited_evidence" | "undetermined";
   main_reasons: string[];
+  modules_used?: string[];
+  paper_metadata?: Record<string, unknown> | null;
 }
 
 export interface CombinedAnalysisResponse {
@@ -59,5 +75,7 @@ export interface CombinedAnalysisResponse {
   ml_analysis: MLAnalysis;
   consistency_analysis: ConsistencyAnalysis;
   final_assessment: FinalAssessment;
+  modules_used?: string[];
+  paper_metadata?: Record<string, unknown> | null;
   warnings?: string[];
 }

@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from app.schemas.consistency import ConsistencyReport
 from app.schemas.ml import MLAnalysisResult
+from app.schemas.paper import ExtractionQuality
 
 
 class RiskSignal(BaseModel):
@@ -34,6 +35,9 @@ class ReportInput(BaseModel):
     citation_results: dict | None = None
     metadata_results: dict | None = None
     ml_results: MLAnalysisResult | None = None
+    extraction_quality: ExtractionQuality | None = None
+    paper_metadata: dict | None = None
+    metadata_verification: dict | None = None
 
 
 class RiskReport(BaseModel):
@@ -49,4 +53,8 @@ class RiskReport(BaseModel):
     signals: list[RiskSignal] = Field(default_factory=list)
     passed_checks: list[str] = Field(default_factory=list)
     modules_used: list[str] = Field(default_factory=list)
+    extraction_quality: ExtractionQuality | None = None
+    assessment_status: str = Field(default="evaluated", description="'evaluated', 'limited_evidence', or 'undetermined'")
+    paper_metadata: dict | None = None
+    metadata_verification: dict | None = None
     generated_at: datetime
