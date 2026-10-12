@@ -117,39 +117,6 @@ Technical Lead, Backend & PDF Processing Engineer (repository-wide coordination)
 
 ---
 
-## 2026-10-12 — Technical Lead, Backend & PDF Processing Engineer
-
-### Role
-Technical Lead, Backend & PDF Processing Engineer
-
-### Work completed
-- Prepared the coordinated backend, ML, citation/review, frontend, and documentation changes for repository publication.
-- Fixed frontend lint and type-check issues in the analysis progress, landing, methodology, and report dashboard components.
-- Excluded the generated `sample-papers/test_paper.pdf` artifact from the commit.
-
-### Files changed
-- Existing pending changes across `backend/`, `frontend/`, `ml/`, `docs/`, and root configuration files.
-
-### Tests run
-- Backend: `python -m pytest -q` -> 284 passed, 1 existing Starlette deprecation warning.
-- Frontend: `npm run lint` -> passed with 1 existing font warning.
-- Frontend: `npm run build` -> passed.
-
-### Current state
-- Changes are verified and committed as `ce336f1`; push to `origin/main` is pending.
-
-### Next recommended task
-- Extract keywords/index terms and add parser regression coverage.
-
-### Dependencies or blockers
-- None.
-
-### Commit / push
-- Commit: `ce336f1`
-- Pushed to main: No
-
----
-
 ## 2026-08-01 — Technical Lead, Backend & PDF Processing Engineer (Phases 6–7)
 
 ### Role

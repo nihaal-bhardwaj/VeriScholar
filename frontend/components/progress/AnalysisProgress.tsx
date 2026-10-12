@@ -47,12 +47,10 @@ export default function AnalysisProgress({
   const [stageProgress, setStageProgress] = useState<number[]>(new Array(STAGES.length).fill(0));
 
   const onCompleteRef = useRef(onComplete);
-  const onErrorRef = useRef(onError);
+  onCompleteRef.current = onComplete;
 
-  useEffect(() => {
-    onCompleteRef.current = onComplete;
-    onErrorRef.current = onError;
-  }, [onComplete, onError]);
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
 
   const paperTitle = file ? file.name.replace(/\.pdf$/i, "") : MOCK_REPORT.paper_title;
 
@@ -87,7 +85,7 @@ export default function AnalysisProgress({
       }
 
       let apiResult: RiskReport | null = null;
-      let apiError: unknown = null;
+      let apiError: any = null;
 
       apiPromise
         .then((res) => {
@@ -101,9 +99,7 @@ export default function AnalysisProgress({
       for (let i = 0; i < STAGES.length; i++) {
         if (cancelled) return;
         if (apiError) {
-          onErrorRef.current(
-            apiError instanceof Error ? apiError.message : "Failed to analyze paper."
-          );
+          onErrorRef.current(apiError?.message || "Failed to analyze paper.");
           return;
         }
 
@@ -122,7 +118,7 @@ export default function AnalysisProgress({
       if (!apiResult && !apiError) {
         try {
           apiResult = await apiPromise;
-        } catch (err: unknown) {
+        } catch (err: any) {
           apiError = err;
         }
       }
@@ -130,9 +126,7 @@ export default function AnalysisProgress({
       if (cancelled) return;
 
       if (apiError) {
-        onErrorRef.current(
-          apiError instanceof Error ? apiError.message : "Failed to analyze paper."
-        );
+        onErrorRef.current(apiError?.message || "Failed to analyze paper.");
       } else if (apiResult) {
         await new Promise((r) => setTimeout(r, prefersReducedMotion ? 40 : 350));
         if (!cancelled) {

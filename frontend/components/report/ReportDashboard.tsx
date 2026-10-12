@@ -1,28 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { RiskSignal, MOCK_CITATIONS } from "../../lib/mockData";
-
-interface ReportData {
-  paper_title?: string;
-  paper_authors?: string[];
-  paper?: { title?: string | null; authors?: string[] };
-  risk_score?: number;
-  risk_level?: string;
-  confidence?: number;
-  final_assessment?: {
-    risk_score?: number | null;
-    risk_level?: string | null;
-    confidence?: number | null;
-  };
-  signals?: RiskSignal[];
-  passed_checks?: string[];
-  modules_used?: string[];
-  generated_at?: string;
-}
+import { RiskReport, RiskSignal, MOCK_CITATIONS, MockCitation } from "../../lib/mockData";
 
 export interface ReportDashboardProps {
-  data: ReportData;
+  data: RiskReport | any;
   isMock?: boolean;
   onBack?: () => void;
   onReset?: () => void;
@@ -30,6 +12,7 @@ export interface ReportDashboardProps {
 
 export default function ReportDashboard({
   data,
+  isMock = false,
   onBack,
   onReset,
 }: ReportDashboardProps) {
@@ -66,11 +49,9 @@ export default function ReportDashboard({
 
     const target = Math.round(riskScore);
     if (prefersReducedMotion) {
-      const frameId = requestAnimationFrame(() => {
-        setAnimatedScore(target);
-        setAnimatedWidth(target);
-      });
-      return () => cancelAnimationFrame(frameId);
+      setAnimatedScore(target);
+      setAnimatedWidth(target);
+      return;
     }
 
     const duration = 1000;
@@ -331,7 +312,7 @@ export default function ReportDashboard({
         {/* DISCLAIMER NOTE */}
         <div className="border-t border-[var(--border-soft)] pt-3 mt-4 text-xs font-sans text-[var(--text-muted)] leading-relaxed">
           <span className="font-serif italic text-[var(--accent)] mr-1">Note.</span>
-          This is a screening result, not a finding. VeriScholar surfaces signals worth a reviewer&apos;s attention — it does not prove or disprove research misconduct.
+          This is a screening result, not a finding. VeriScholar surfaces signals worth a reviewer's attention — it does not prove or disprove research misconduct.
         </div>
       </section>
 
@@ -581,7 +562,7 @@ export default function ReportDashboard({
                   Example reference format
                 </h3>
                 <p className="font-sans text-xs text-[var(--text-muted)]">
-                  These are example citations, not from this paper&apos;s analysis.
+                  These are example citations, not from this paper's analysis.
                 </p>
               </div>
 

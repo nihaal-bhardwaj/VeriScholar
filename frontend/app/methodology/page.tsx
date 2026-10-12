@@ -37,17 +37,12 @@ const METHODOLOGY_STEPS = [
 ];
 
 export default function MethodologyPage() {
-  const [theme, setTheme] = useState<"dark" | "light">(() => {
-    if (typeof document !== "undefined") {
-      const currentTheme = document.documentElement.getAttribute("data-theme");
-      if (currentTheme === "light" || currentTheme === "dark") return currentTheme;
-    }
-    return "dark";
-  });
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
 
   useEffect(() => {
-    if (!document.documentElement.getAttribute("data-theme")) {
-      document.documentElement.setAttribute("data-theme", "dark");
+    const currentTheme = document.documentElement.getAttribute("data-theme") as "dark" | "light" | null;
+    if (currentTheme) {
+      setTheme(currentTheme);
     }
   }, []);
 

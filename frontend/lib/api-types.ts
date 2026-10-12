@@ -63,7 +63,7 @@ export interface FinalAssessment {
   assessment_status?: "evaluated" | "limited_evidence" | "undetermined";
   main_reasons: string[];
   modules_used?: string[];
-  paper_metadata?: Record<string, unknown> | null;
+  paper_metadata?: Record<string, any> | null;
 }
 
 export interface CombinedAnalysisResponse {
@@ -76,6 +76,6 @@ export interface CombinedAnalysisResponse {
   consistency_analysis: ConsistencyAnalysis;
   final_assessment: FinalAssessment;
   modules_used?: string[];
-  paper_metadata?: Record<string, unknown> | null;
+  paper_metadata?: Record<string, any> | null;
   warnings?: string[];
 }

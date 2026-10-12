@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { RiskReport } from "../lib/mockData";
+import { RiskReport, MOCK_REPORT } from "../lib/mockData";
 import AnalysisProgress from "../components/progress/AnalysisProgress";
 import ReportDashboard from "../components/report/ReportDashboard";
 import AnalysisError from "../components/AnalysisError";
@@ -15,19 +15,16 @@ export default function HomePage() {
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [inlineValidationError, setInlineValidationError] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState<boolean>(false);
-  const [theme, setTheme] = useState<"dark" | "light">(() => {
-    if (typeof document !== "undefined") {
-      const currentTheme = document.documentElement.getAttribute("data-theme");
-      if (currentTheme === "light" || currentTheme === "dark") return currentTheme;
-    }
-    return "dark";
-  });
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Synchronize theme attribute on mount and toggle
   useEffect(() => {
-    if (!document.documentElement.getAttribute("data-theme")) {
+    const currentTheme = document.documentElement.getAttribute("data-theme") as "dark" | "light" | null;
+    if (currentTheme) {
+      setTheme(currentTheme);
+    } else {
       document.documentElement.setAttribute("data-theme", "dark");
     }
   }, []);
@@ -63,7 +60,7 @@ export default function HomePage() {
     }
   };
 
-  const handleSampleClick = () => {
+  const handleSampleClick = (sampleIndex: number) => {
     setInlineValidationError(null);
     setSelectedFile(null);
     setIsMockMode(true);
@@ -272,7 +269,7 @@ export default function HomePage() {
                 {/* Sample 1 */}
                 <button
                   type="button"
-                  onClick={handleSampleClick}
+                  onClick={() => handleSampleClick(0)}
                   className="w-full text-left py-4 flex justify-between items-center group relative hover:pl-3 transition-all cursor-pointer"
                 >
                   <div className="space-y-1">
@@ -296,7 +293,7 @@ export default function HomePage() {
                 {/* Sample 2 */}
                 <button
                   type="button"
-                  onClick={handleSampleClick}
+                  onClick={() => handleSampleClick(1)}
                   className="w-full text-left py-4 flex justify-between items-center group relative hover:pl-3 transition-all cursor-pointer"
                 >
                   <div className="space-y-1">
@@ -320,7 +317,7 @@ export default function HomePage() {
                 {/* Sample 3 */}
                 <button
                   type="button"
-                  onClick={handleSampleClick}
+                  onClick={() => handleSampleClick(2)}
                   className="w-full text-left py-4 flex justify-between items-center group relative hover:pl-3 transition-all cursor-pointer"
                 >
                   <div className="space-y-1">
