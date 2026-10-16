@@ -8,7 +8,7 @@ Living document. Update it at the end of every working session.
 - **Primary module:** Research Paper Integrity Risk Detector
 - **Secondary module:** Fake Review Detector
 - **Current stage:** Project completed — Dual-engine VeriScholar integrity platform (Manuscript Screener & Review Astroturf Detector) fully implemented, hardened, and verified with 292/292 passing backend tests and clean Next.js production build.
-- **Last known stable commit:** `8e31762` — project completed
+- **Last known stable commit:** `e024d6b` — project completed
 - **Test status:** Backend 292/292 passing; frontend production build passing cleanly
 
 > The commit hash above is checked against Git history on every session start. If `git log` shows a newer commit, treat that newer commit as the latest and update this document.
