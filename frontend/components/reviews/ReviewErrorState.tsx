@@ -4,17 +4,27 @@ import React from "react";
 
 interface ReviewErrorStateProps {
   status?: number;
+  message?: string;
   errorMessage?: string;
-  onTryAgain: () => void;
-  onSwitchToManual: () => void;
+  onRetry?: () => void;
+  onTryAgain?: () => void;
+  onManualFallback?: () => void;
+  onSwitchToManual?: () => void;
 }
 
 export default function ReviewErrorState({
   status,
+  message,
   errorMessage,
+  onRetry,
   onTryAgain,
+  onManualFallback,
   onSwitchToManual,
 }: ReviewErrorStateProps) {
+  const displayMsg = message || errorMessage;
+  const handleRetry = onRetry || onTryAgain || (() => {});
+  const handleManual = onManualFallback || onSwitchToManual || (() => {});
+
   const isScraperFailure = status === 502 || status === 504;
   const isUnsupportedSite = status === 400;
 
@@ -22,10 +32,10 @@ export default function ReviewErrorState({
     <div
       role="alert"
       aria-live="assertive"
-      className="w-full max-w-lg mx-auto p-6 sm:p-8 bg-[var(--rc-card)] border border-[var(--rc-border)] rounded-2xl shadow-md text-center font-sans space-y-6"
+      className="saas-card p-8 sm:p-10 text-center font-sans space-y-6 max-w-lg mx-auto shadow-2xl"
     >
       {/* Icon */}
-      <div className="w-14 h-14 mx-auto rounded-full bg-red-50 border border-red-100 flex items-center justify-center text-[var(--rc-danger)]">
+      <div className="w-14 h-14 mx-auto rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
         <svg
           className="w-7 h-7"
           viewBox="0 0 24 24"
@@ -44,34 +54,34 @@ export default function ReviewErrorState({
       {/* Content based on error status */}
       {isScraperFailure ? (
         <div className="space-y-2">
-          <h3 className="text-lg sm:text-xl font-semibold text-[var(--rc-text)] tracking-tight">
-            We couldn&apos;t fetch reviews from that link.
+          <h3 className="text-xl font-bold text-[var(--text)] tracking-tight">
+            Unable to fetch reviews from this link
           </h3>
-          <p className="text-sm text-[var(--rc-text-muted)] leading-relaxed max-w-sm mx-auto">
-            This can happen if the page structure has changed or the site is blocking automated access.
+          <p className="text-sm text-[var(--text-muted)] leading-relaxed max-w-sm mx-auto">
+            The target site may have updated its layout or has active bot protection. You can paste reviews manually to continue.
           </p>
-          {errorMessage && (
-            <p className="text-xs text-[var(--rc-danger)] font-mono pt-1 opacity-80">
-              {errorMessage}
+          {displayMsg && (
+            <p className="text-xs text-rose-400/80 font-mono pt-1">
+              {displayMsg}
             </p>
           )}
         </div>
       ) : isUnsupportedSite ? (
         <div className="space-y-2">
-          <h3 className="text-lg sm:text-xl font-semibold text-[var(--rc-text)] tracking-tight">
+          <h3 className="text-xl font-bold text-[var(--text)] tracking-tight">
             Unsupported Product Link
           </h3>
-          <p className="text-sm text-[var(--rc-text-muted)] leading-relaxed max-w-sm mx-auto">
+          <p className="text-sm text-[var(--text-muted)] leading-relaxed max-w-sm mx-auto">
             We currently support Amazon, Flipkart, Meesho, Ajio, and Shopsy product links.
           </p>
         </div>
       ) : (
         <div className="space-y-2">
-          <h3 className="text-lg sm:text-xl font-semibold text-[var(--rc-text)] tracking-tight">
-            Something went wrong.
+          <h3 className="text-xl font-bold text-[var(--text)] tracking-tight">
+            Inspection Could Not Complete
           </h3>
-          <p className="text-sm text-[var(--rc-text-muted)] leading-relaxed max-w-sm mx-auto">
-            {errorMessage || "Please check your network connection and try again."}
+          <p className="text-sm text-[var(--text-muted)] leading-relaxed max-w-sm mx-auto">
+            {displayMsg || "Please check your network connection and try again."}
           </p>
         </div>
       )}
@@ -82,34 +92,26 @@ export default function ReviewErrorState({
           <>
             <button
               type="button"
-              onClick={onSwitchToManual}
-              className="w-full sm:w-auto px-5 py-3 bg-[var(--rc-primary)] hover:bg-[var(--rc-primary-dark)] text-white font-medium rounded-xl shadow-sm hover:shadow-md transition-all text-sm cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--rc-primary)]"
+              onClick={handleManual}
+              className="btn-primary w-full sm:w-auto text-xs sm:text-sm py-2.5 px-5 cursor-pointer"
             >
               Paste reviews manually instead
             </button>
             <button
               type="button"
-              onClick={onTryAgain}
-              className="w-full sm:w-auto px-4 py-3 bg-white hover:bg-gray-50 text-[var(--rc-text)] border border-[var(--rc-border)] font-medium rounded-xl transition-all text-sm cursor-pointer"
+              onClick={handleRetry}
+              className="btn-secondary w-full sm:w-auto text-xs sm:text-sm py-2.5 px-4 cursor-pointer"
             >
-              Try link again
+              Try again
             </button>
           </>
-        ) : isUnsupportedSite ? (
-          <button
-            type="button"
-            onClick={onTryAgain}
-            className="w-full sm:w-auto px-6 py-3 bg-[var(--rc-primary)] hover:bg-[var(--rc-primary-dark)] text-white font-medium rounded-xl shadow-sm hover:shadow-md transition-all text-sm cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--rc-primary)]"
-          >
-            Try a different link
-          </button>
         ) : (
           <button
             type="button"
-            onClick={onTryAgain}
-            className="w-full sm:w-auto px-6 py-3 bg-[var(--rc-primary)] hover:bg-[var(--rc-primary-dark)] text-white font-medium rounded-xl shadow-sm hover:shadow-md transition-all text-sm cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--rc-primary)]"
+            onClick={handleRetry}
+            className="btn-primary w-full sm:w-auto text-xs sm:text-sm py-2.5 px-6 cursor-pointer"
           >
-            Try again
+            Try Again
           </button>
         )}
       </div>

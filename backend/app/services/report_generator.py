@@ -48,7 +48,10 @@ def _modules_used(data: ReportInput) -> list[str]:
     modules: list[str] = []
     if data.consistency_report is not None:
         modules.append("consistency")
-    if data.citation_results is not None:
+    if (
+        data.citation_results is not None
+        and data.citation_results.get("status") != "unavailable"
+    ):
         modules.append("citations")
     if (
         data.metadata_results is not None
@@ -146,6 +149,47 @@ def _signals_from_ml(result: MLAnalysisResult) -> list[RiskSignal]:
     return signals
 
 
+def _signals_from_citations(citation_results: dict | None) -> list[RiskSignal]:
+    """Convert citation verification results into explainable risk signals."""
+    if not citation_results or citation_results.get("status") == "unavailable":
+        return []
+
+    signals: list[RiskSignal] = []
+    verified = citation_results.get("verified", 0)
+    unresolved = citation_results.get("unresolved", 0)
+    total = verified + unresolved
+
+    if total >= 5:
+        unresolved_ratio = unresolved / total
+        if unresolved_ratio >= 0.70:
+            signals.append(
+                RiskSignal(
+                    source="citations",
+                    severity="high",
+                    message=(
+                        f"High citation non-resolution rate: {unresolved} of {total} "
+                        f"({unresolved_ratio * 100:.0f}%) references could not be verified in Crossref or OpenAlex"
+                    ),
+                    evidence=f"{verified} verified, {unresolved} unresolved out of {total} checked references",
+                    weight=1.0,
+                )
+            )
+        elif unresolved_ratio >= 0.40:
+            signals.append(
+                RiskSignal(
+                    source="citations",
+                    severity="medium",
+                    message=(
+                        f"Substantial portion of citations unverified: {unresolved} of {total} "
+                        f"({unresolved_ratio * 100:.0f}%) references could not be confirmed"
+                    ),
+                    evidence=f"{verified} verified, {unresolved} unresolved out of {total} checked references",
+                    weight=round(_SEVERITY_WEIGHTS.get("medium", 0.5333), 4),
+                )
+            )
+    return signals
+
+
 def generate_report(data: ReportInput) -> RiskReport:
     """Combine all module outputs into a single risk report."""
     modules = _modules_used(data)
@@ -158,10 +202,14 @@ def generate_report(data: ReportInput) -> RiskReport:
     if data.ml_results is not None:
         ml_signals = _signals_from_ml(data.ml_results)
 
-    signals = consistency_signals + ml_signals
+    citation_signals: list[RiskSignal] = []
+    if data.citation_results is not None:
+        citation_signals = _signals_from_citations(data.citation_results)
+
+    signals = consistency_signals + ml_signals + citation_signals
 
     score = 0.0
-    for signal in consistency_signals:
+    for signal in consistency_signals + citation_signals:
         score += _SEVERITY_POINTS.get(signal.severity, 0.0)
     if data.ml_results is not None:
         score += data.ml_results.ml_risk_contribution
@@ -182,6 +230,14 @@ def generate_report(data: ReportInput) -> RiskReport:
         passed_checks.extend(data.consistency_report.passed_checks)
     if data.ml_results is not None:
         passed_checks.extend(data.ml_results.passed_rules)
+    if data.citation_results is not None and data.citation_results.get("status") != "unavailable":
+        v = data.citation_results.get("verified", 0)
+        u = data.citation_results.get("unresolved", 0)
+        t = v + u
+        if t > 0 and (v / t) >= 0.5:
+            passed_checks.append(
+                f"citation_verification: {v} of {t} ({v/t*100:.0f}%) sampled references verified in public bibliographic indexes"
+            )
 
     meta = data.paper_metadata or data.metadata_verification or data.metadata_results
 
@@ -200,5 +256,6 @@ def generate_report(data: ReportInput) -> RiskReport:
         assessment_status=assessment_status,
         paper_metadata=meta,
         metadata_verification=meta,
+        citation_results=data.citation_results,
         generated_at=datetime.now(timezone.utc),
     )

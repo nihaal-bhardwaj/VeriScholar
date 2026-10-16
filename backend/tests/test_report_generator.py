@@ -241,3 +241,43 @@ def test_analyze_full_endpoint_rejects_missing_file(client):
 
     assert response.status_code == 400
     assert "error" in response.json()
+
+
+def test_citation_results_high_unresolved_ratio_generates_high_severity_signal():
+    citation_data = {
+        "status": "completed",
+        "verified": 1,
+        "unresolved": 9,
+        "warnings": [],
+        "details": [],
+    }
+    input_data = ReportInput(
+        analysis_id="test-citations",
+        paper_title="Citation Test Paper",
+        citation_results=citation_data,
+    )
+    report = generate_report(input_data)
+    assert "citations" in report.modules_used
+    assert report.risk_score == 15.0  # high severity = 15 pts
+    citation_signals = [s for s in report.signals if s.source == "citations"]
+    assert len(citation_signals) == 1
+    assert citation_signals[0].severity == "high"
+    assert "High citation non-resolution rate" in citation_signals[0].message
+
+
+def test_citation_results_unavailable_status_does_not_add_to_modules_used():
+    citation_data = {
+        "status": "unavailable",
+        "verified": 0,
+        "unresolved": 5,
+        "warnings": ["API timeout"],
+        "details": [],
+    }
+    input_data = ReportInput(
+        analysis_id="test-citations-unavail",
+        paper_title="Citation Test Paper",
+        citation_results=citation_data,
+    )
+    report = generate_report(input_data)
+    assert "citations" not in report.modules_used
+    assert report.risk_score == 0.0

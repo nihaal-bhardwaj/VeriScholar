@@ -13,6 +13,9 @@ from app.schemas.reviews import (
     ScrapedReviewData,
 )
 from app.services.reviews.llm_analyzer import (
+    DEFAULT_GEMINI_MODEL,
+    MIN_ALLOWED_GEMINI_VERSION,
+    _validate_gemini_model,
     analyze_review_with_llm,
     analyze_reviews_batch_with_llm,
 )
@@ -573,3 +576,150 @@ def test_batch_llm_delay():
         assert mock_single.call_count == 3
         # 3 reviews -> 2 delays of 0.2s = 0.4s total sleep minimum
         assert elapsed >= 0.35, f"Expected delay >= 0.35s, got {elapsed:.3f}s"
+
+
+def test_gemini_model_validation_rejects_sub_3_1():
+    """Ensure Gemini models below version 3.1 are strictly rejected and enforced to default."""
+    assert _validate_gemini_model("gemini-1.5-flash") == DEFAULT_GEMINI_MODEL
+    assert _validate_gemini_model("gemini-2.0-flash") == DEFAULT_GEMINI_MODEL
+    assert _validate_gemini_model("gemini-2.5-pro") == DEFAULT_GEMINI_MODEL
+    assert _validate_gemini_model("gemini-3.0-flash") == DEFAULT_GEMINI_MODEL
+    assert _validate_gemini_model("models/gemini-1.5-pro") == DEFAULT_GEMINI_MODEL
+    assert _validate_gemini_model("non-gemini-model") == DEFAULT_GEMINI_MODEL
+    assert _validate_gemini_model("") == DEFAULT_GEMINI_MODEL
+
+
+def test_gemini_model_validation_accepts_3_1_and_above():
+    """Ensure Gemini models with version >= 3.1 are accepted as valid."""
+    assert _validate_gemini_model("gemini-3.1-flash") == "gemini-3.1-flash"
+    assert _validate_gemini_model("gemini-3.1-pro-preview") == "gemini-3.1-pro-preview"
+    assert _validate_gemini_model("gemini-3.5-flash") == "gemini-3.5-flash"
+    assert _validate_gemini_model("gemini-3.8-flash") == "gemini-3.8-flash"
+    assert _validate_gemini_model("models/gemini-3.1-flash-lite") == "gemini-3.1-flash-lite"
+
+
+def test_gemini_api_call_success():
+    """Gemini 3.1+ API call successfully parses structured JSON response."""
+    valid_payload = {
+        "authenticity_score": 95,
+        "classification": "likely_genuine",
+        "confidence": "high",
+        "reasoning": "Real user experience with specific physical observations.",
+        "signals": [
+            {
+                "type": "specific_detail_present",
+                "is_suspicious": False,
+                "description": "Mentions exact dimensions and zipper durability.",
+            }
+        ],
+        "llm_available": True,
+    }
+
+    gemini_resp_json = {
+        "candidates": [
+            {
+                "content": {
+                    "parts": [{"text": json.dumps(valid_payload)}]
+                }
+            }
+        ]
+    }
+
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = gemini_resp_json
+
+    with patch("app.services.reviews.llm_analyzer.get_settings") as mock_settings, \
+         patch("httpx.Client.post", return_value=mock_resp) as mock_post:
+        settings_instance = MagicMock()
+        settings_instance.gemini_api_key = "AIzaSyMockGeminiKey_12345"
+        settings_instance.gemini_model = "gemini-3.1-flash-lite"
+        settings_instance.groq_api_key = ""
+        mock_settings.return_value = settings_instance
+
+        review = ScrapedReview(
+            review_text="The backpack stitching is reinforced and fits my 15-inch laptop with room to spare.",
+            rating=5,
+        )
+
+        result = analyze_review_with_llm(review, product_title="Laptop Backpack")
+
+        assert result.llm_available is True
+        assert result.authenticity_score == 95
+        assert result.classification == "likely_genuine"
+        assert result.confidence == "high"
+        assert len(result.signals) == 1
+        assert result.fallback_reason is None
+
+        # Verify URL targeted Gemini endpoint
+        mock_post.assert_called_once()
+        call_url = mock_post.call_args[0][0]
+        assert "models/gemini-3.1-flash-lite:generateContent" in call_url
+
+
+def test_gemini_api_timeout():
+    """Gemini API timeout gracefully returns fallback_reason='timeout'."""
+    import httpx
+
+    with patch("app.services.reviews.llm_analyzer.get_settings") as mock_settings, \
+         patch("httpx.Client.post", side_effect=httpx.TimeoutException("Connection timed out")):
+        settings_instance = MagicMock()
+        settings_instance.gemini_api_key = "AIzaSyMockGeminiKey_12345"
+        settings_instance.gemini_model = "gemini-3.1-flash-lite"
+        settings_instance.groq_api_key = ""
+        mock_settings.return_value = settings_instance
+
+        review = ScrapedReview(
+            review_text="Tested for 2 weeks, works fine.",
+            rating=4,
+        )
+
+        result = analyze_review_with_llm(review)
+
+        assert result.llm_available is False
+        assert result.fallback_reason == "timeout"
+
+
+def test_gemini_api_error_status():
+    """Gemini API non-200 HTTP status returns fallback_reason='api_error'."""
+    mock_resp = MagicMock()
+    mock_resp.status_code = 503
+    mock_resp.text = "Service Unavailable"
+
+    with patch("app.services.reviews.llm_analyzer.get_settings") as mock_settings, \
+         patch("httpx.Client.post", return_value=mock_resp):
+        settings_instance = MagicMock()
+        settings_instance.gemini_api_key = "AIzaSyMockGeminiKey_12345"
+        settings_instance.gemini_model = "gemini-3.1-flash-lite"
+        settings_instance.groq_api_key = ""
+        mock_settings.return_value = settings_instance
+
+        review = ScrapedReview(
+            review_text="Tested for 2 weeks, works fine.",
+            rating=4,
+        )
+
+        result = analyze_review_with_llm(review)
+
+        assert result.llm_available is False
+        assert result.fallback_reason == "api_error"
+
+
+def test_groq_model_setting_configurable():
+    """Custom groq_model configured in Settings is passed to Groq completion."""
+    with patch("app.services.reviews.llm_analyzer.get_settings") as mock_settings, \
+         patch("app.services.reviews.llm_analyzer.Groq") as mock_groq_cls, \
+         patch("app.services.reviews.llm_analyzer._call_groq_completion", return_value='{"authenticity_score": 90, "classification": "likely_genuine", "confidence": "high", "reasoning": "Genuine", "signals": [], "llm_available": true}') as mock_call:
+        settings_instance = MagicMock()
+        settings_instance.gemini_api_key = ""
+        settings_instance.groq_api_key = "gsk_mock_groq_key"
+        settings_instance.groq_model = "llama-3.3-70b-versatile"
+        mock_settings.return_value = settings_instance
+
+        review = ScrapedReview(review_text="Solid product, holds charge as expected.", rating=5)
+        result = analyze_review_with_llm(review)
+
+        assert result.llm_available is True
+        mock_call.assert_called_once()
+        _, kwargs = mock_call.call_args
+        assert kwargs.get("model") == "llama-3.3-70b-versatile"

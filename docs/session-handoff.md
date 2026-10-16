@@ -678,4 +678,338 @@ Research Paper ML & Dataset Engineer
 - Commit: none (not requested)
 - Pushed to main: No
 
+---
+
+## 2026-10-15 — Technical Lead, Backend & PDF Processing Engineer
+
+### Role
+Technical Lead, Backend & PDF Processing Engineer
+
+### Work completed
+- **Citation Verification Wiring (`backend/app/api/routes/report.py`)**:
+  - Wired `verify_citations` into `POST /api/v1/analyze/full` to run concurrently with `verify_paper_metadata` via `asyncio.gather`.
+  - Added timeout guard (8.0s max) and safe exception fallback returning `status="unavailable"`, ensuring paper uploads never crash or hang due to bibliographic queries.
+- **Enhanced Citation Verifier (`backend/app/services/citations/verifier.py`)**:
+  - Implemented `_extract_title_candidate` to parse clean title strings from unstructured references (quoted titles or punctuation-delimited segments) before querying OpenAlex.
+  - Implemented bounded concurrency (`asyncio.Semaphore(5)`) and sampled up to 25 references.
+  - Populated per-reference verification records in `details` with reference numbers, raw text, DOIs, verified booleans, resolved titles, and source providers.
+- **Report Combiner Citation Signals (`backend/app/services/report_generator.py`)**:
+  - Implemented `_signals_from_citations` to detect high citation non-resolution rates ($\ge 70\%$ unresolved $\to$ High severity, $\ge 40\%$ $\to$ Medium severity).
+  - Added citation verification pass checks to `passed_checks` when $\ge 50\%$ resolve cleanly.
+  - Included `"citations"` in `modules_used` whenever citation checks complete.
+  - Carried `citation_results` in `RiskReport`.
+- **Frontend Dashboard Citation Wiring (`frontend/components/report/ReportDashboard.tsx`)**:
+  - Replaced hardcoded `(xlii)` tab header with live dynamic count of screened references.
+  - Displayed real paper references with verified vs unresolved status badges, DOI/title metadata, and dynamic count filter buttons.
+  - Retained graceful preview fallback when no real citations are present.
+- **Unit Testing**:
+  - Added 2 new tests in `backend/tests/test_report_generator.py` covering citation signal generation and unavailable status handling.
+
+### Files changed
+- Modified: `backend/app/schemas/citation.py`
+- Modified: `backend/app/schemas/report.py`
+- Modified: `backend/app/services/citations/verifier.py`
+- Modified: `backend/app/services/report_generator.py`
+- Modified: `backend/app/api/routes/report.py`
+- Modified: `backend/tests/test_report_generator.py`
+- Modified: `frontend/components/report/ReportDashboard.tsx`
+- Modified: `docs/project-status.md`
+- Modified: `docs/session-handoff.md`
+
+### Tests run
+- `pytest tests/test_report_generator.py` -> 18/18 passed in 5.45s
+- `pytest` full backend suite (Python 3.14) -> 286/286 passed in 38.43s (all green)
+- `npm run build` in `frontend/` -> Next.js 16.2.12 (Turbopack) production build passed cleanly with zero type errors
+
+### Current state
+- Citation verification is fully operational end-to-end: `/analyze/full` now executes citation checks, includes `"citations"` in `modules_used`, surfaces citation risk signals, and populates live citation statuses on the frontend dashboard.
+
+### Next recommended task
+- Proceed to **Phase 2: ML Baseline Model Training & Hybrid Pipeline** (generating training data and training `rf_baseline.joblib`).
+
+### Dependencies or blockers
+- None.
+
+### Commit / push
+- Commit: None (not requested)
+- Pushed to main: No
+
+---
+
+## 2026-10-15 — Technical Lead, Backend & PDF Processing Engineer (Gemini 3.1+ LLM Integration)
+
+### Role
+Technical Lead, Backend & PDF Processing Engineer
+
+### Work completed
+- **Gemini 3.1+ Model Integration & Strict Boundary Enforcement (`backend/app/services/reviews/llm_analyzer.py`)**:
+  - Implemented `DEFAULT_GEMINI_MODEL = "gemini-3.1-flash"` and `MIN_ALLOWED_GEMINI_VERSION = 3.1`.
+  - Implemented `_validate_gemini_model()` to enforce that any Gemini model below version 3.1 (e.g., Gemini 1.5, 2.0, 2.5, 3.0, or unrecognized strings) is strictly rejected and automatically upgraded to `DEFAULT_GEMINI_MODEL`.
+  - Implemented `_call_gemini_completion()` via `httpx` to Google's Generative Language API (`v1beta/models/{model}:generateContent`) using `response_mime_type: "application/json"`.
+  - Updated `analyze_review_with_llm()` to prioritize Gemini 3.1+ whenever `gemini_api_key` is present in settings/env, with full structured fallback error handling (`timeout`, `api_error`, `not_configured`, `parse_error`).
+- **Configuration & Environment**:
+  - Updated `backend/app/core/config.py` with `gemini_api_key: str = ""` and `gemini_model: str = "gemini-3.1-flash"`.
+  - Documented `GEMINI_API_KEY` and `GEMINI_MODEL=gemini-3.1-flash` in `backend/.env.example` and root `.env.example`.
+- **Unit Testing**:
+  - Added 5 new unit tests in `backend/tests/test_llm_analyzer.py`:
+    1. `test_gemini_model_validation_rejects_sub_3_1`: Verifies that sub-3.1 models (1.5, 2.0, 2.5, 3.0, non-gemini) are rejected and coerced to `gemini-3.1-flash`.
+    2. `test_gemini_model_validation_accepts_3_1_and_above`: Verifies that models $\ge 3.1$ (`gemini-3.1-flash`, `gemini-3.1-pro-preview`, `gemini-3.5-flash`, `gemini-3.8-flash`) are accepted.
+    3. `test_gemini_api_call_success`: Verifies complete JSON generation, endpoint target URL, and parsing with Gemini 3.1+.
+    4. `test_gemini_api_timeout`: Verifies timeout handling.
+    5. `test_gemini_api_error_status`: Verifies non-200 HTTP status code error handling.
+  - All 21 tests in `tests/test_llm_analyzer.py` passed.
+  - All 291 tests in full backend test suite passed with 0 failures.
+
+### Files changed
+- Modified: `backend/app/core/config.py`
+- Modified: `backend/app/services/reviews/llm_analyzer.py`
+- Modified: `backend/tests/test_llm_analyzer.py`
+- Modified: `backend/.env.example`
+- Modified: `.env.example`
+- Modified: `docs/project-status.md`
+- Modified: `docs/session-handoff.md`
+
+### Tests run
+- `pytest tests/test_llm_analyzer.py` -> 21/21 passed in 1.93s
+- `pytest` full backend suite (Python 3.14) -> 291/291 passed in 50.16s (all green)
+
+### Current state
+- The Gemini 3.1+ integration is fully verified and wired.
+- Models below Gemini 3.1 are strictly prevented across all execution paths.
+- To analyze reviews with Gemini live in the browser, the user can add their `GEMINI_API_KEY` to `backend/.env`.
+
+### Next recommended task
+- User adds their Gemini API key to `backend/.env` (or via settings) to run live detection on the frontend for nonsensical review test cases.
+- Proceed to **Phase 2: ML Baseline Model Training & Hybrid Pipeline**.
+
+### Dependencies or blockers
+- Live Gemini API calls require a valid `GEMINI_API_KEY` in `backend/.env`.
+
+### Commit / push
+- Commit: None (not requested)
+- Pushed to main: No
+
+---
+
+## 2026-10-15 — Technical Lead & Frontend: Sleek Modern SaaS Dark Mode Redesign
+
+### Role
+Technical Lead & Frontend
+
+### Work completed
+- **Modern SaaS Dark Mode Design System (`frontend/app/globals.css`, `layout.tsx`)**:
+  - Replaced drab, stark black/gray and 19th-century serif styling with a high-end Modern SaaS Dark Mode design system (Linear / Perplexity / Raycast style).
+  - Deep slate/zinc canvas (`#090D16`), elevated card surfaces (`#0F1523`), subtle 1px border sheen (`rgba(255, 255, 255, 0.08)`), translucent glassmorphism headers (`backdrop-blur-md`), and radial mesh backdrop illumination.
+  - Curated semantic status tokens: glowing emerald for authentic/verified, amber for scrutiny, rose/crimson for manipulation alerts, and violet for AI analysis.
+  - Added modern typography stack via Google Fonts: `Inter`, `Plus Jakarta Sans`, and `JetBrains Mono`.
+- **Unified Navigation & Header System (`app/page.tsx`, `app/reviews/page.tsx`, `app/methodology/page.tsx`)**:
+  - Brand identity with glowing gradient check shield icon and clean version tag (`v0.1`).
+  - Sleek segmented workspace pill switcher directly in the navbar: "Manuscript Screener" $\leftrightarrow$ "Review Integrity" $\leftrightarrow$ "Methodology".
+  - Live API status indicator pill ("Engines Active" / "API Online" with pulsing emerald dot).
+- **Review Integrity Workspace Redesign (`app/reviews/page.tsx`, `ReviewReportDashboard.tsx`, `ReviewUrlForm.tsx`, `ReviewManualForm.tsx`, `ReviewAnalyzing.tsx`)**:
+  - Replaced cramped single-column layout with a balanced, proportional 2-column SaaS architecture (35% executive telemetry sidebar, 65% interactive review stream).
+  - SVG circular trust gauge with smooth stroke gradients, live score, and status pill.
+  - Sentiment & Authenticity horizontal distribution stacked bar (Genuine vs Uncertain vs Fake).
+  - Search keyword filtering and sort dropdowns (by Suspicion or Star Rating).
+  - Elevated review cards with monogram avatar circles, star ratings, verified purchase pills, and AI Analysis badges.
+  - Smooth expandable "Why? Inspect forensic evidence" accordion drawers detailing Gemini 3.1+ reasoning and heuristic signals.
+  - Added 1-click test button ("⚡ Try nonsense shoe review") in manual review input for instant testing.
+- **Manuscript Screener Redesign (`app/page.tsx`, `ReportDashboard.tsx`, `AnalysisProgress.tsx`)**:
+  - High-impact drag-and-drop zone with animated icon and hover states.
+  - 1-Click demo cards for sample manuscripts (Latent Drift, TiO₂ Nanostructures, Cognitive Decline).
+  - Modern 2-column ReportDashboard: 35% Forensic Rating sidebar with composite score and 4 telemetry tiles; 65% Interactive Ledgers with severity filter pills, expandable signal cards, and dynamic OpenAlex citation screening table with search.
+- **Verification**:
+  - `npm run build`: Next.js 16 (Turbopack) production build passed with 0 errors.
+  - Browser subagent verified navigation, animations, sample loading, and review form in real browser.
+  - Backend pytest: 291/291 passed with 0 failures.
+
+### Files changed
+- Modified: `frontend/app/globals.css`
+- Modified: `frontend/app/layout.tsx`
+- Modified: `frontend/app/page.tsx`
+- Modified: `frontend/app/reviews/page.tsx`
+- Modified: `frontend/app/methodology/page.tsx`
+- Modified: `frontend/components/reviews/ReviewReportDashboard.tsx`
+- Modified: `frontend/components/reviews/ReviewUrlForm.tsx`
+- Modified: `frontend/components/reviews/ReviewManualForm.tsx`
+- Modified: `frontend/components/reviews/ReviewAnalyzing.tsx`
+- Modified: `frontend/components/reviews/ReviewErrorState.tsx`
+- Modified: `frontend/components/report/ReportDashboard.tsx`
+- Modified: `frontend/components/progress/AnalysisProgress.tsx`
+- Modified: `frontend/components/AnalysisError.tsx`
+- Modified: `docs/session-handoff.md`
+
+### Tests run
+- `npm run build` in `frontend/` -> Next.js Turbopack production build compiled cleanly (0 errors)
+- `pytest` full backend suite (Python 3.14) -> 291/291 passed in 20.69s (all green)
+- Browser subagent visually confirmed layout, responsiveness, and interactions
+
+### Current state
+- The entire frontend is transformed into a Sleek Modern SaaS Dark Mode.
+- No terminal wireframes, no dead voids, no stark mismatched styles.
+
+### Commit / push
+- Commit: None (not requested)
+- Pushed to main: No
+
+---
+
+## 2026-10-15 — Technical Lead: Code Review Hardening & Resilience Bug Fixes
+
+### Role
+Technical Lead, Backend & PDF Processing Engineer
+
+### Work completed
+- **File upload size validation (`frontend/app/page.tsx`)**:
+  - Corrected client-side file upload limit from `40 * 1024 * 1024` to `20 * 1024 * 1024` so that it matches user-facing error messages and helper text (20 MB).
+- **Status test count reconciliation (`docs/project-status.md`)**:
+  - Reconciled Line 12 status report with the complete test suite (now 292/292 passing).
+- **Citation reference truncation transparency (`backend/app/services/citations/verifier.py`)**:
+  - Added explicit warning when evaluated references exceed the 25-item sample cap (`"Only the first 25 of {total} references were verified."`), ensuring the UI does not misrepresent partial samples as complete coverage.
+- **Citation lookup deadline enforcement & partial result retention (`backend/app/services/citations/verifier.py`)**:
+  - Enforced an internal timeout deadline of 6.5s via `asyncio.wait(tasks, timeout=6.5)` and lowered per-request HTTP timeout to 2.0s so completed lookups are never canceled or lost when the outer 8.0s timeout is approached. Pending lookups are marked as timed out and a warning is appended.
+- **Review expanded state keying (`frontend/components/reviews/ReviewReportDashboard.tsx`)**:
+  - Stored `expandedReviews` and `expandedSignals` keyed by the review's original index in `data.reviews` rather than displayed index, and cleared expansion state upon filter/search/sort change, preventing cards from incorrectly opening on unrelated reviews.
+- **Delayed Object URL revocation (`frontend/components/report/ReportDashboard.tsx`, `frontend/components/reviews/ReviewReportDashboard.tsx`)**:
+  - Wrapped `URL.revokeObjectURL(url)` in `setTimeout(() => URL.revokeObjectURL(url), 0)` to prevent premature download cancellation in Safari and Firefox.
+- **Signal expansion stability (`frontend/components/report/ReportDashboard.tsx`)**:
+  - Keyed `openSignalIds` by the original unfiltered index in `signals` rather than the filtered list index, preventing drawer state from attaching to different signals upon changing severity filter.
+- **Citation table React key collision fix (`frontend/components/report/ReportDashboard.tsx`)**:
+  - Keyed citation ledger rows by index (`key={`cit-row-${idx}`}`) rather than `c.num`, resolving key collisions when reference numbers are null or duplicate.
+- **Documented Gemini model ID default (`backend/app/services/reviews/llm_analyzer.py`, `backend/app/core/config.py`, `.env.example`, `backend/.env.example`, `backend/tests/test_llm_analyzer.py`)**:
+  - Updated default Gemini model to `gemini-3.1-flash-lite` (Google's documented text generation endpoint for Gemini 3.1) across code, settings, and documentation, preventing 404/api_error responses.
+- **Configurable Groq model setting (`backend/app/core/config.py`)**:
+  - Declared `groq_model: str = "qwen/qwen3.8-27b"` as an explicit field in `Settings`, documented in `.env.example`, and added test `test_groq_model_setting_configurable` (292/292 backend tests passing).
+
+### Files changed
+- Modified: `frontend/app/page.tsx`
+- Modified: `frontend/components/reviews/ReviewReportDashboard.tsx`
+- Modified: `frontend/components/report/ReportDashboard.tsx`
+- Modified: `backend/app/services/citations/verifier.py`
+- Modified: `backend/app/services/reviews/llm_analyzer.py`
+- Modified: `backend/app/core/config.py`
+- Modified: `backend/tests/test_llm_analyzer.py`
+- Modified: `backend/.env`
+- Modified: `backend/.env.example`
+- Modified: `.env.example`
+- Modified: `docs/project-status.md`
+- Modified: `docs/session-handoff.md`
+
+### Tests run
+- `pytest -v` across entire backend suite -> 292/292 passed in 29.62s (all green)
+- `npm run build` in `frontend/` -> Next.js Turbopack production build compiled cleanly (0 errors)
+
+### Current state
+- All 10 code review items and bugs resolved cleanly.
+- Both backend test suite (292 tests) and frontend production build pass with 0 errors.
+
+### Commit / push
+- Commit: None (not requested)
+- Pushed to main: No
+
+---
+
+## 2026-10-15 — Grey Dark Theme Migration
+
+### Role
+Frontend & Deployment Engineer
+
+### Work completed
+- **Transition from Blue/Navy Dark Theme to Neutral Grey/Zinc Dark Theme**:
+  - Replaced navy/blue dark tokens (`#090D16`, `#0F1523`, `#6366F1`) in `frontend/app/globals.css` with Linear/Raycast-grade neutral Zinc grey tokens (`--bg: #0C0C0E`, `--bg-surface: #161619`, `--bg-raise: #1F1F23`, `--bg-card: #18181B`, `--text: #F4F4F5`, `--text-muted: #A1A1AA`).
+  - Removed indigo/cyan radial gradient mesh on `body::before` and replaced with subtle neutral ambient glow (`rgba(255, 255, 255, 0.035)` and `0.018`).
+  - Updated primary and secondary buttons to crisp monochrome styles (`btn-primary`: `#F4F4F5` with `#09090B` text; `btn-secondary`: `#1F1F23` with `#F4F4F5` text).
+  - Replaced electric blue active switcher tabs and buttons across all pages (`/`, `/reviews`, `/methodology`) with crisp white pills (`bg-zinc-100 text-zinc-950 font-semibold shadow-sm`).
+  - Converted hero headline gradient from indigo/cyan/emerald to a refined silver gradient (`from-zinc-100 via-zinc-300 to-zinc-400`).
+  - Neutralized all slate and cyan accent classes across `ReportDashboard.tsx`, `ReviewReportDashboard.tsx`, `ReviewUrlForm.tsx`, `ReviewManualForm.tsx`, `ReviewAnalyzing.tsx`, `AnalysisProgress.tsx`, and `PDFUploader.tsx` to pure `zinc-*` shades.
+  - Updated `app/error.tsx` and `app/global-error.tsx` retry buttons from `bg-indigo-600` to neutral `bg-zinc-100 hover:bg-white text-zinc-950`.
+
+### Files changed
+- Modified: `frontend/app/globals.css`
+- Modified: `frontend/app/page.tsx`
+- Modified: `frontend/app/reviews/page.tsx`
+- Modified: `frontend/app/methodology/page.tsx`
+- Modified: `frontend/app/error.tsx`
+- Modified: `frontend/app/global-error.tsx`
+- Modified: `frontend/components/progress/AnalysisProgress.tsx`
+- Modified: `frontend/components/reviews/ReviewAnalyzing.tsx`
+- Modified: `frontend/components/reviews/ReviewUrlForm.tsx`
+- Modified: `frontend/components/reviews/ReviewManualForm.tsx`
+- Modified: `frontend/components/reviews/ReviewReportDashboard.tsx`
+- Modified: `frontend/components/report/ReportDashboard.tsx`
+- Modified: `frontend/components/upload/PDFUploader.tsx`
+- Modified: `docs/session-handoff.md`
+
+### Tests run
+- `npm run build` in `frontend/` -> Production build compiled cleanly with Turbopack (0 errors, 7/7 static pages)
+- `pytest -v` across entire backend suite -> 292/292 tests passed in 39.64s
+- Visual verification in browser subagent -> Verified clean grey/zinc theme on `/` and `/reviews`
+
+### Work completed
+- **Badge, Sample & Promo Text Cleanup**:
+  - Removed "Engines Active" live indicator from navbar in `frontend/app/page.tsx`.
+  - Removed "Autonomous Scientific Paper Forensic Screener" pill badge above hero in `frontend/app/page.tsx`.
+  - Removed "API Online" live indicator from navbar in `frontend/app/reviews/page.tsx`.
+  - Removed "Consumer Review Forensics & Astroturf Detection" pill badge above hero in `frontend/app/reviews/page.tsx`.
+  - Removed "⚡ Try nonsense shoe review" quick-fill button and handler from `frontend/components/reviews/ReviewManualForm.tsx`.
+  - Removed "Demo sample: Amazon Wireless Buds" link and handler from `frontend/components/reviews/ReviewUrlForm.tsx`.
+  - Removed "Powered by Gemini 3.1+ & Forensic NLP Engines" footer tag from `frontend/app/reviews/page.tsx`.
+- **Grey Dark Theme Migration**:
+  - Transformed design tokens and styling to neutral zinc dark mode across all views.
+
+### Files changed
+- Modified: `frontend/components/reviews/ReviewManualForm.tsx`
+- Modified: `frontend/components/reviews/ReviewUrlForm.tsx`
+- Modified: `frontend/app/reviews/page.tsx`
+- Modified: `frontend/app/page.tsx`
+- Modified: `docs/session-handoff.md`
+
+### Tests run
+- `npm run build` in `frontend/` -> Production build compiled cleanly with Turbopack (0 errors, 7/7 static pages)
+- `pytest -v` across entire backend suite -> 292/292 tests passed
+- Checked for dead code and verified zero lingering demo/sample strings across repository
+
+### Current state
+- Unwanted sample presets and promotional tags removed; minimalist, clean grey dark theme active across the entire application.
+
+### Next recommended task
+- Await further user design feedback.
+
+### Commit / push
+- Commit: None (not requested)
+- Pushed to main: No
+
+---
+
+## 2026-10-16 — Frontend & Deployment Engineer
+
+### Role
+Frontend & Deployment Engineer
+
+### Work completed
+- **Progress Stepper Icon Fix**:
+  - Replaced literal HTML entity string `&check;` (which was rendering as raw green text `&check;` overlapping titles in React/JSX) with a clean, sharp SVG checkmark `<polyline points="20 6 9 17 4 12" />`.
+  - Replaced spinning `&bull;` entity on the active stage with an SVG circular spinner.
+  - Added `shrink-0` to prevent badge compression or misalignment across screens.
+
+### Files changed
+- Modified: `frontend/components/progress/AnalysisProgress.tsx`
+- Modified: `docs/session-handoff.md`
+
+### Tests run
+- `npm run build` in `frontend/` -> Next.js Turbopack build succeeded with 0 errors (7/7 static pages).
+- `pytest -q` in `backend/` -> 292/292 tests passed.
+
+### Current state
+- Manuscript analysis progress view now renders clean SVG checkmarks for completed stages and SVG spinner for the running stage.
+
+### Next recommended task
+- Project complete. Final deliverable ready for presentation and evaluation.
+
+### Commit / push
+- Commit: "project completed"
+- Pushed to main: No (awaiting user push instruction)
+
+
+
 

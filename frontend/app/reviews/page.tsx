@@ -20,7 +20,6 @@ export default function ReviewsPage() {
   const [errorStatus, setErrorStatus] = useState<number | undefined>(undefined);
   const [errorMessage, setErrorMessage] = useState<string | undefined>(undefined);
 
-  // VeriScholar navbar theme tracking
   const [theme, setTheme] = useState<"dark" | "light">("dark");
 
   useEffect(() => {
@@ -89,13 +88,13 @@ export default function ReviewsPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-between font-sans bg-[var(--rc-bg)] text-[var(--rc-text)] transition-colors">
+    <div className="min-h-screen flex flex-col justify-between font-sans bg-[var(--bg)] text-[var(--text)] transition-colors relative z-10">
       {/* ═════════════════════════════════════════════════════════════════════
-          VERISCHOLAR NAVBAR (Editorial style preserved per Section 1 & 5)
+          MODERN SAAS NAVBAR (Linear/Perplexity style)
          ═════════════════════════════════════════════════════════════════════ */}
-      <header className="sticky top-0 z-50 w-full bg-[var(--bg)]/90 backdrop-blur-sm border-b border-[var(--border-soft)]">
-        <div className="container-wide h-[76px] flex items-center justify-between">
-          {/* Wordmark */}
+      <header className="sticky top-0 z-50 w-full bg-[var(--bg)]/80 backdrop-blur-md border-b border-[var(--border)]">
+        <div className="max-w-7xl mx-auto h-[68px] px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+          {/* Wordmark (no icon, no gradient) */}
           <Link href="/" className="flex items-baseline cursor-pointer">
             <span className="font-sans font-semibold text-lg tracking-tight text-[var(--text)]">
               Veri
@@ -105,69 +104,53 @@ export default function ReviewsPage() {
             </span>
           </Link>
 
-          {/* Navigation Links & Theme Toggle */}
-          <div className="flex items-center gap-8">
-            <nav className="flex items-center gap-6 text-sm font-sans">
-              <Link
-                href="/"
-                className="text-[var(--text-muted)] hover:text-[var(--text)] pb-0.5 transition-colors cursor-pointer"
-              >
-                Analyzer
-              </Link>
-              <Link
-                href="/methodology"
-                className="text-[var(--text-muted)] hover:text-[var(--text)] pb-0.5 transition-colors cursor-pointer"
-              >
-                Methodology
-              </Link>
-              <Link
-                href="/reviews"
-                className="text-[var(--text)] border-b border-[var(--accent)] pb-0.5 font-medium cursor-pointer"
-              >
-                Review Checker
-              </Link>
-            </nav>
+          {/* Segmented Workspace Switcher */}
+          <nav className="flex items-center p-1 bg-zinc-900/90 rounded-xl border border-white/[0.08] text-xs font-medium">
+            <Link
+              href="/"
+              className="px-3.5 py-1.5 rounded-lg text-zinc-400 hover:text-zinc-100 transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              <svg className="w-3.5 h-3.5 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+              </svg>
+              <span>Manuscript Screener</span>
+            </Link>
 
-            {/* Theme Toggle Button */}
+            <Link
+              href="/reviews"
+              className="px-3.5 py-1.5 rounded-lg bg-zinc-100 text-zinc-950 shadow-sm transition-all cursor-pointer font-semibold flex items-center gap-1.5"
+            >
+              <svg className="w-3.5 h-3.5 text-zinc-950" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+              </svg>
+              <span>Review Integrity</span>
+            </Link>
+
+            <Link
+              href="/methodology"
+              className="hidden sm:flex px-3.5 py-1.5 rounded-lg text-zinc-400 hover:text-zinc-100 transition-all cursor-pointer"
+            >
+              Methodology
+            </Link>
+          </nav>
+
+          {/* Right Theme Toggle */}
+          <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={toggleTheme}
-              className="text-[var(--text-muted)] hover:text-[var(--text)] transition-colors p-1 cursor-pointer"
+              className="w-8 h-8 rounded-lg bg-zinc-900 border border-white/[0.08] text-zinc-400 hover:text-zinc-100 flex items-center justify-center cursor-pointer transition-colors"
               aria-label="Toggle theme"
             >
               {theme === "dark" ? (
-                // Moon Icon
-                <svg
-                  className="w-[17px] h-[17px]"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
                 </svg>
               ) : (
-                // Sun Icon
-                <svg
-                  className="w-[17px] h-[17px]"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="12" cy="12" r="4" />
-                  <path d="M12 2v2" />
-                  <path d="M12 20v2" />
-                  <path d="m4.93 4.93 1.41 1.41" />
-                  <path d="m17.66 17.66 1.41 1.41" />
-                  <path d="M2 12h2" />
-                  <path d="M20 12h2" />
-                  <path d="m6.34 17.66-1.41 1.41" />
-                  <path d="m19.07 4.93-1.41 1.41" />
+                  <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
                 </svg>
               )}
             </button>
@@ -176,24 +159,20 @@ export default function ReviewsPage() {
       </header>
 
       {/* ═════════════════════════════════════════════════════════════════════
-          MAIN CONTENT AREA (Distinct Consumer/Modern Design)
+          MAIN CONTENT AREA (Distinct Modern SaaS Canvas)
          ═════════════════════════════════════════════════════════════════════ */}
-      <main className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         {/* STATE: INPUT */}
         {pageState === "input" && (
-          <div className="w-full max-w-2xl mx-auto space-y-8 animate-tab-panel">
-            {/* Friendly Centered Hero */}
-            <div className="text-center space-y-3">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-xs font-semibold text-[var(--rc-primary)]">
-                <span className="w-2 h-2 rounded-full bg-[var(--rc-primary)]" />
-                Consumer Trust &amp; Safety Tool
-              </div>
-              <h1 className="text-2xl sm:text-4xl font-extrabold text-[var(--rc-text)] tracking-tight">
-                Is this product&apos;s reviews trustworthy?
+          <div className="w-full max-w-3xl mx-auto space-y-8 animate-tab-panel">
+            {/* SaaS Centered Hero */}
+            <div className="text-center space-y-3 pt-4">
+              <h1 className="text-3xl sm:text-5xl font-extrabold text-[var(--text)] tracking-tight">
+                Are these product reviews <span className="bg-gradient-to-r from-zinc-100 via-zinc-300 to-zinc-400 bg-clip-text text-transparent">trustworthy?</span>
               </h1>
-              <p className="text-sm sm:text-base text-[var(--rc-text-muted)] max-w-lg mx-auto leading-relaxed">
-                Paste a product link from Amazon or Flipkart and we&apos;ll check if
-                the reviews look genuine.
+
+              <p className="text-sm sm:text-base text-[var(--text-muted)] max-w-xl mx-auto leading-relaxed">
+                Scan Amazon and Flipkart product pages for bot-generated praise, unnatural keyword stuffing, and physical incoherence using Gemini 3.1+ LLM intelligence.
               </p>
             </div>
 
@@ -202,7 +181,7 @@ export default function ReviewsPage() {
               <div
                 role="tablist"
                 aria-label="Review Input Modes"
-                className="inline-flex p-1 bg-gray-200/80 rounded-full border border-[var(--rc-border)]"
+                className="inline-flex p-1 bg-zinc-900/90 rounded-xl border border-white/[0.08] shadow-inner"
               >
                 <button
                   type="button"
@@ -211,13 +190,17 @@ export default function ReviewsPage() {
                   aria-selected={activeTab === "url"}
                   aria-controls="panel-url"
                   onClick={() => setActiveTab("url")}
-                  className={`px-5 py-2 rounded-full text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+                  className={`px-5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 ${
                     activeTab === "url"
-                      ? "bg-white text-[var(--rc-primary)] shadow-sm"
-                      : "text-[var(--rc-text-muted)] hover:text-[var(--rc-text)]"
+                      ? "bg-zinc-100 text-zinc-950 shadow-md font-semibold"
+                      : "text-zinc-400 hover:text-zinc-100"
                   }`}
                 >
-                  Paste a product link
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                  <span>Scan by Product URL</span>
                 </button>
                 <button
                   type="button"
@@ -226,13 +209,17 @@ export default function ReviewsPage() {
                   aria-selected={activeTab === "manual"}
                   aria-controls="panel-manual"
                   onClick={() => setActiveTab("manual")}
-                  className={`px-5 py-2 rounded-full text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+                  className={`px-5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all cursor-pointer flex items-center gap-2 ${
                     activeTab === "manual"
-                      ? "bg-white text-[var(--rc-primary)] shadow-sm"
-                      : "text-[var(--rc-text-muted)] hover:text-[var(--rc-text)]"
+                      ? "bg-zinc-100 text-zinc-950 shadow-md font-semibold"
+                      : "text-zinc-400 hover:text-zinc-100"
                   }`}
                 >
-                  Paste reviews manually
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                  </svg>
+                  <span>Paste Reviews Manually</span>
                 </button>
               </div>
             </div>
@@ -243,7 +230,7 @@ export default function ReviewsPage() {
                 id="panel-url"
                 role="tabpanel"
                 aria-labelledby="tab-url"
-                className="bg-[var(--rc-card)] p-6 sm:p-8 rounded-2xl border border-[var(--rc-border)] shadow-sm space-y-4"
+                className="saas-card p-6 sm:p-8 space-y-4"
               >
                 <ReviewUrlForm onSubmit={handleUrlSubmit} />
               </div>
@@ -255,7 +242,7 @@ export default function ReviewsPage() {
                 id="panel-manual"
                 role="tabpanel"
                 aria-labelledby="tab-manual"
-                className="bg-transparent space-y-4"
+                className="saas-card p-6 sm:p-8 space-y-4"
               >
                 <ReviewManualForm onSubmit={handleManualSubmit} />
               </div>
@@ -265,33 +252,41 @@ export default function ReviewsPage() {
 
         {/* STATE: ANALYZING */}
         {pageState === "analyzing" && (
-          <div className="py-12 sm:py-16 animate-tab-panel">
-            <ReviewAnalyzing />
-          </div>
-        )}
-
-        {/* STATE: ERROR */}
-        {pageState === "error" && (
-          <div className="py-12 animate-tab-panel">
-            <ReviewErrorState
-              status={errorStatus}
-              errorMessage={errorMessage}
-              onTryAgain={handleResetToInput}
-              onSwitchToManual={handleSwitchToManualFallback}
-            />
+          <div className="w-full max-w-xl mx-auto py-12">
+            <ReviewAnalyzing mode={activeTab} />
           </div>
         )}
 
         {/* STATE: REPORT */}
         {pageState === "report" && reportData && (
-          <div className="animate-tab-panel">
-            <ReviewReportDashboard
-              data={reportData}
-              onReset={handleResetToInput}
+          <ReviewReportDashboard data={reportData} onReset={handleResetToInput} />
+        )}
+
+        {/* STATE: ERROR */}
+        {pageState === "error" && (
+          <div className="w-full max-w-xl mx-auto py-8">
+            <ReviewErrorState
+              status={errorStatus}
+              message={errorMessage}
+              onRetry={handleResetToInput}
+              onManualFallback={handleSwitchToManualFallback}
             />
           </div>
         )}
       </main>
+
+      {/* FOOTER */}
+      <footer className="w-full border-t border-[var(--border)] py-6 bg-[var(--bg)] text-xs text-[var(--text-faint)]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-[var(--text)]">VeriScholar</span>
+            <span>&bull; Academic Integrity &amp; Consumer Trust Analytics</span>
+          </div>
+          <div className="font-mono text-[11px]">
+            Screening Instrument &bull; Not a Determination of Misconduct
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

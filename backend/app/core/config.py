@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     demo_mode: bool = False
     scraperapi_key: str = ""
     groq_api_key: str = ""
+    groq_model: str = "qwen/qwen3.8-27b"
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-3.1-flash-lite"
 
     @property
     def max_upload_size_bytes(self) -> int:

@@ -57,4 +57,5 @@ class RiskReport(BaseModel):
     assessment_status: str = Field(default="evaluated", description="'evaluated', 'limited_evidence', or 'undetermined'")
     paper_metadata: dict | None = None
     metadata_verification: dict | None = None
+    citation_results: dict | None = None
     generated_at: datetime

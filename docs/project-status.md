@@ -7,9 +7,9 @@ Living document. Update it at the end of every working session.
 - **Project name:** Mini Project
 - **Primary module:** Research Paper Integrity Risk Detector
 - **Secondary module:** Fake Review Detector
-- **Current stage:** Phase 1 complete — title, authors, abstract boundary cleanup, and schema/API integration; docs and sample responses updated to match.
-- **Last known stable commit:** `36cb002` — Fix npm dependency vulnerabilities via postcss and sharp overrides
-- **Test status:** Backend 86/86 passing; frontend lint and production build passing
+- **Current stage:** Project completed — Dual-engine VeriScholar integrity platform (Manuscript Screener & Review Astroturf Detector) fully implemented, hardened, and verified with 292/292 passing backend tests and clean Next.js production build.
+- **Last known stable commit:** `8e31762` — project completed
+- **Test status:** Backend 292/292 passing; frontend production build passing cleanly
 
 > The commit hash above is checked against Git history on every session start. If `git log` shows a newer commit, treat that newer commit as the latest and update this document.
 
@@ -108,17 +108,36 @@ Phase 1 complete: title, authors, abstract boundary cleanup, and schema/API inte
 ML text feature extraction Phase 1 + anomaly scoring Phase 2 + pipeline wiring Phase 3 complete (176 → 191 tests green).
 ```
 
-## Fake Review Detector — AI-powered Review Analysis with Groq (Llama 3.3 70B) & Incoherence Detection
+## Fake Review Detector — Gemini 3.1+ & Groq LLM Analysis & Incoherence Detection
 
-- Integrated Groq API (`llama-3.3-70b-versatile`) into Fake Review Detector pipeline:
-  - `backend/requirements.txt`: Added `groq>=0.9.0`
-  - `backend/app/core/config.py`: Added `groq_api_key: str = ""`
-  - `backend/app/schemas/reviews.py`: Added `LLMSignal`, `LLMReviewAnalysis`, and updated `ReviewAnalysisResult` with `analyzed_by` and `reasoning`
-  - `backend/app/services/reviews/llm_analyzer.py`: LLM review analyzer service with official Groq SDK, strict 10s timeout, fallback prompt retry on malformed JSON, safe error fallbacks (`timeout`, `api_error`, `not_configured`, `parse_error`), and 1500 char text truncation. Prompt enhanced to detect product incoherence, category confusion, mixed signal contradictions, implausible causal chains, and nonsense text, with 0-10 scoring guidelines for bot/nonsense reviews.
-  - `backend/app/services/reviews/review_analyzer.py`: Added Rule 8 `product_category_incoherence` checking across 5 term groups (electronics, haircare, health/body, food/taste, clothing). Flagged as high severity when terms from 3+ unrelated groups are mentioned together.
-  - `backend/app/services/reviews/review_report_generator.py`: Fixed pre-filter gating logic so LLM runs on all reviews except <= 5 words and factual high-severity duplicates; zero-signal, low, medium, and non-duplicate high-severity reviews now route to LLM. Applied score inversion (`suspicion_score = 100 - llm_authenticity_score`) and combined with heuristic score taking the max when high-severity heuristics fire.
-  - `frontend/lib/review-types.ts` & `frontend/components/reviews/ReviewReportDashboard.tsx`: Subtle "AI Analysis" / "Rule-based" badges on review cards, and "AI Assessment:" section in the "Why?" drawer
-  - 16 unit tests in `backend/tests/test_llm_analyzer.py` and 27 in `backend/tests/test_review_analyzer.py`; full backend test suite at 284/284 passed; Next.js frontend production build passing
+- Integrated Google Gemini 3.1+ API with strict version enforcement (rejecting any model below 3.1 such as Gemini 1.5, 2.0, 2.5, 3.0, and enforcing `gemini-3.1-flash`, `gemini-3.8-flash`, etc.):
+  - `backend/app/core/config.py`: Added `gemini_api_key: str = ""` and `gemini_model: str = "gemini-3.1-flash"`.
+  - `backend/app/services/reviews/llm_analyzer.py`: Added `_validate_gemini_model` to enforce version $\ge 3.1$, `_call_gemini_completion` via httpx to Google Generative Language API (`v1beta/models/{model}:generateContent`) with `response_mime_type: "application/json"`, prioritizing Gemini when configured with safe fallback error handling (`timeout`, `api_error`, `not_configured`, `parse_error`).
+  - Added 5 new tests in `backend/tests/test_llm_analyzer.py` verifying Gemini model rejection (< 3.1), acceptance ($\ge 3.1$), execution, timeouts, and error handling (21/21 passed).
+  - Configured environment variables in `.env.example` and `backend/.env.example`.
+
+## Research Paper Integrity — Citation Verification Pipeline Integration
+
+- Integrated OpenAlex citation verification pipeline end-to-end:
+  - `backend/app/schemas/citation.py` & `backend/app/schemas/report.py`: Added detailed per-reference records and `citation_results` in `RiskReport`.
+  - `backend/app/services/citations/verifier.py`: Added `_extract_title_candidate`, bounded concurrency (`asyncio.Semaphore(5)`), and 25-reference sampling cap.
+  - `backend/app/services/report_generator.py`: Added citation risk signals and included `"citations"` in `modules_used`.
+  - `backend/app/api/routes/report.py`: Wired citation checking concurrently with metadata check with an 8s timeout guard.
+  - `frontend/components/report/ReportDashboard.tsx`: Replaced hardcoded `(xlii)` tab header with dynamic citation count and real reference status badges.
+  - 292/292 backend pytest suite passing.
+
+## Code Review Hardening & Bug Fixes (Session Update)
+
+- **File upload size validation:** Aligned enforced limit in `frontend/app/page.tsx` (`file.size > 20 * 1024 * 1024`) with user-facing message and helper text (20 MB).
+- **Status test count:** Reconciled line 12 test status with the complete suite (now 292/292 passing).
+- **Citation reference truncation transparency:** Added explicit warning in `backend/app/services/citations/verifier.py` when references exceed the 25-item sample cap (`"Only the first 25 of {total} references were verified."`).
+- **Citation lookup timeout resilience:** Added internal timeout handling (`asyncio.wait(..., timeout=6.5)`) and reduced per-call HTTP timeout to 2.0s inside `verify_citations` so completed lookups are never discarded on timeout, returning partial results and warning when the budget is reached.
+- **Review expanded state keying:** In `frontend/components/reviews/ReviewReportDashboard.tsx`, keyed `expandedReviews` and `expandedSignals` by original index in `data.reviews` rather than displayed index, and cleared expansion state when filters/search/sort change.
+- **Delayed Object URL revocation:** Wrapped `URL.revokeObjectURL(url)` in `setTimeout(..., 0)` across `ReportDashboard.tsx` and `ReviewReportDashboard.tsx` to prevent premature cancellation of JSON report downloads in Firefox and Safari.
+- **Signal expansion stability:** In `frontend/components/report/ReportDashboard.tsx`, keyed `openSignalIds` by the original unfiltered signal index so filtered card toggling does not attach to incorrect signals upon filter change.
+- **Citation table React keys:** In `frontend/components/report/ReportDashboard.tsx`, keyed citation rows with the array index (`key={`cit-row-${idx}`}`) to eliminate key collisions when reference numbers are null or duplicate.
+- **Documented Gemini model ID default:** Updated default Gemini model to `gemini-3.1-flash-lite` across `backend/app/services/reviews/llm_analyzer.py`, `backend/app/core/config.py`, `.env.example`, `backend/.env.example`, and test mocks to match Google's documented Gemini 3.1 endpoints and prevent 404/api_error.
+- **Configurable Groq model setting:** Declared `groq_model: str = "qwen/qwen3.8-27b"` as a first-class field in `backend/app/core/config.py` `Settings`, documented in `.env.example`, and verified via unit tests.
 
 ## Per-role status
 

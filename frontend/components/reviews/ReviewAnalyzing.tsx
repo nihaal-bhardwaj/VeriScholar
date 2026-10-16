@@ -2,20 +2,21 @@
 
 import React, { useEffect, useState } from "react";
 
-const STATUS_MESSAGES = [
-  "Fetching reviews...",
-  "Checking writing patterns...",
-  "Comparing reviews to each other...",
-  "Calculating trust score...",
+const STEPS = [
+  { label: "Connecting to e-commerce endpoint...", phase: "Network Ingestion" },
+  { label: "Extracting reviewer verified status & ratings...", phase: "Metadata Parsing" },
+  { label: "Running common-sense & category incoherence checks...", phase: "Gemini 3.1+ LLM Analysis" },
+  { label: "Evaluating phrase repetition & astroturfing bursts...", phase: "Forensic Heuristics" },
+  { label: "Synthesizing composite trust index & suspicion score...", phase: "Final Report Aggregation" },
 ];
 
-export default function ReviewAnalyzing() {
-  const [index, setIndex] = useState(0);
+export default function ReviewAnalyzing({ mode = "url" }: { mode?: string }) {
+  const [currentStep, setCurrentStep] = useState(0);
 
   useEffect(() => {
     const timer = setInterval(() => {
-      setIndex((prev) => (prev + 1) % STATUS_MESSAGES.length);
-    }, 1500);
+      setCurrentStep((prev) => (prev < STEPS.length - 1 ? prev + 1 : prev));
+    }, 1200);
     return () => clearInterval(timer);
   }, []);
 
@@ -23,45 +24,49 @@ export default function ReviewAnalyzing() {
     <div
       role="status"
       aria-live="polite"
-      className="w-full max-w-md mx-auto p-8 sm:p-10 bg-[var(--rc-card)] border border-[var(--rc-border)] rounded-2xl shadow-md text-center font-sans space-y-6"
+      className="saas-card p-8 sm:p-10 text-center font-sans space-y-6 relative overflow-hidden shadow-2xl"
     >
-      {/* Animated Pulsing & Spinning Container */}
+      {/* Background ambient illumination */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-20 bg-white/[0.03] blur-2xl pointer-events-none" />
+
+      {/* Modern Radar / Radar Ping Icon */}
       <div className="relative w-20 h-20 mx-auto flex items-center justify-center">
-        {/* Pulsing halo */}
-        <div className="absolute inset-0 rounded-full bg-[var(--rc-primary)] opacity-20 animate-ping" />
-
-        {/* Spinning gradient ring */}
-        <div
-          className="w-16 h-16 rounded-full border-4 border-[var(--rc-border)] border-t-[var(--rc-primary)] border-r-[var(--rc-primary)] animate-spin"
-          aria-hidden="true"
-        />
-
-        {/* Center icon */}
-        <div className="absolute inset-0 flex items-center justify-center text-[var(--rc-primary)]">
-          <svg
-            className="w-7 h-7"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
+        <div className="absolute inset-0 rounded-full bg-white/[0.03] animate-ping" />
+        <div className="w-16 h-16 rounded-full border-2 border-zinc-700 border-t-zinc-200 border-r-zinc-400 animate-spin" />
+        <div className="absolute inset-0 flex items-center justify-center text-zinc-200">
+          <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
           </svg>
         </div>
       </div>
 
-      <div className="space-y-2">
-        <h3 className="text-lg sm:text-xl font-semibold text-[var(--rc-text)] tracking-tight">
-          Analyzing Product Reviews
+      <div className="space-y-3">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-800 border border-zinc-700 text-xs font-mono text-zinc-300">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          {STEPS[currentStep].phase}
+        </div>
+
+        <h3 className="text-xl font-bold tracking-tight text-[var(--text)]">
+          Auditing Review Authenticity
         </h3>
-        <p className="text-sm sm:text-base font-medium text-[var(--rc-primary)] min-h-[24px] transition-all duration-300">
-          {STATUS_MESSAGES[index]}
+
+        <p className="text-sm text-[var(--text-muted)] min-h-[22px] font-medium transition-all">
+          {STEPS[currentStep].label}
         </p>
-        <p className="text-xs text-[var(--rc-text-muted)] pt-2">
-          Evaluating sentiment consistency, repetition, and automated writing signatures.
-        </p>
+      </div>
+
+      {/* Telemetry Stepper Track */}
+      <div className="space-y-2 pt-2 border-t border-[var(--border-soft)]">
+        <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-zinc-300 via-zinc-200 to-white transition-all duration-500 rounded-full"
+            style={{ width: `${((currentStep + 1) / STEPS.length) * 100}%` }}
+          />
+        </div>
+        <div className="flex justify-between text-[11px] font-mono text-[var(--text-faint)]">
+          <span>Step {currentStep + 1} of {STEPS.length}</span>
+          <span>{Math.round(((currentStep + 1) / STEPS.length) * 100)}% Complete</span>
+        </div>
       </div>
     </div>
   );

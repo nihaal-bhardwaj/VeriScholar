@@ -33,7 +33,10 @@ def generate(request: ReportInput) -> RiskReport:
     return generate_report(request)
 
 
+import asyncio
+from app.schemas.citation import CitationVerifyRequest
 from app.services.citations.paper_metadata import verify_paper_metadata
+from app.services.citations.verifier import verify_citations
 
 
 @router.post(
@@ -95,22 +98,53 @@ async def analyze_full(file: UploadFile | None = File(default=None)) -> RiskRepo
         extraction_quality=parsed.extraction_quality,
     )
 
-    paper_metadata = None
-    try:
-        paper_metadata = await verify_paper_metadata(
-            title=parsed.title,
-            authors=parsed.authors,
-            doi=parsed.best_doi,
-        )
-    except Exception as exc:
-        logger.warning(f"Paper metadata verification error: {exc}")
-        paper_metadata = {
-            "matched": False,
-            "title_match": False,
-            "author_match": False,
-            "doi_match": False,
-            "status": "unavailable",
-        }
+    async def _fetch_metadata() -> dict:
+        try:
+            return await verify_paper_metadata(
+                title=parsed.title,
+                authors=parsed.authors,
+                doi=parsed.best_doi,
+            )
+        except Exception as exc:
+            logger.warning(f"Paper metadata verification error: {exc}")
+            return {
+                "matched": False,
+                "title_match": False,
+                "author_match": False,
+                "doi_match": False,
+                "status": "unavailable",
+            }
+
+    async def _fetch_citations() -> dict:
+        if not references:
+            return {
+                "status": "completed",
+                "verified": 0,
+                "unresolved": 0,
+                "warnings": [],
+                "details": [],
+            }
+        try:
+            req = CitationVerifyRequest(
+                analysis_id=str(uuid.uuid4()),
+                references=[ref.model_dump() for ref in references],
+            )
+            res = await asyncio.wait_for(verify_citations(req), timeout=8.0)
+            return res.model_dump()
+        except Exception as exc:
+            logger.warning(f"Citation verification error: {exc}")
+            return {
+                "status": "unavailable",
+                "verified": 0,
+                "unresolved": len(references),
+                "warnings": [f"Citation verification unavailable or timed out: {exc}"],
+                "details": [],
+            }
+
+    paper_metadata, citation_results = await asyncio.gather(
+        _fetch_metadata(),
+        _fetch_citations(),
+    )
 
     return generate_report(
         ReportInput(
@@ -123,5 +157,6 @@ async def analyze_full(file: UploadFile | None = File(default=None)) -> RiskRepo
             ml_results=ml_result,
             extraction_quality=parsed.extraction_quality,  # type: ignore[arg-type]
             paper_metadata=paper_metadata,
+            citation_results=citation_results,
         )
     )

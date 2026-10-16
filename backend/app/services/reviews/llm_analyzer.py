@@ -7,6 +7,7 @@ import re
 import time
 from typing import Optional
 
+import httpx
 import groq
 from groq import Groq
 
@@ -15,7 +16,9 @@ from app.schemas.reviews import LLMReviewAnalysis, LLMSignal, ScrapedReview
 
 logger = logging.getLogger(__name__)
 
-MODEL_NAME = "llama-3.3-70b-versatile"
+DEFAULT_GEMINI_MODEL = "gemini-3.1-flash-lite"
+MIN_ALLOWED_GEMINI_VERSION = 3.1
+MODEL_NAME = "qwen/qwen3.8-27b"
 REQUEST_TIMEOUT = 10.0
 MAX_REVIEW_LENGTH = 1500
 
@@ -194,10 +197,89 @@ def _extract_and_parse_json(content: str) -> Optional[dict]:
     return None
 
 
-def _call_groq_completion(client: Groq, system_content: str, user_content: str) -> str:
+def _validate_gemini_model(model_name: str) -> str:
+    """Ensure only Gemini 3 models or higher are used (strictly rejecting models below 3.1)."""
+    if not isinstance(model_name, str) or not model_name.strip():
+        return DEFAULT_GEMINI_MODEL
+    clean_model = model_name.replace("models/", "").strip()
+    version_match = re.search(r"gemini-(\d+(?:\.\d+)?)", clean_model, re.IGNORECASE)
+    if not version_match:
+        logger.warning(
+            "Configured model '%s' is not a recognized Gemini model. Enforcing %s.",
+            clean_model,
+            DEFAULT_GEMINI_MODEL,
+        )
+        return DEFAULT_GEMINI_MODEL
+
+    try:
+        ver = float(version_match.group(1))
+        if ver < MIN_ALLOWED_GEMINI_VERSION:
+            logger.warning(
+                "Configured Gemini model '%s' (version %.1f) is below minimum allowed version %.1f. Enforcing %s.",
+                clean_model,
+                ver,
+                MIN_ALLOWED_GEMINI_VERSION,
+                DEFAULT_GEMINI_MODEL,
+            )
+            return DEFAULT_GEMINI_MODEL
+    except ValueError:
+        return DEFAULT_GEMINI_MODEL
+
+    return clean_model
+
+
+def _call_gemini_completion(
+    api_key: str,
+    model: str,
+    system_content: str,
+    user_content: str,
+) -> str:
+    """Invoke Google Gemini generateContent API (version >= 3.1) with strict timeout."""
+    validated_model = _validate_gemini_model(model)
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{validated_model}:generateContent?key={api_key}"
+
+    payload = {
+        "system_instruction": {
+            "parts": [{"text": system_content}]
+        },
+        "contents": [
+            {
+                "role": "user",
+                "parts": [{"text": user_content}]
+            }
+        ],
+        "generationConfig": {
+            "response_mime_type": "application/json",
+            "temperature": 0.1,
+        },
+    }
+
+    with httpx.Client(timeout=REQUEST_TIMEOUT) as client:
+        resp = client.post(url, json=payload)
+
+    if resp.status_code == 200:
+        data = resp.json()
+        candidates = data.get("candidates", [])
+        if candidates:
+            parts = candidates[0].get("content", {}).get("parts", [])
+            if parts:
+                return parts[0].get("text", "")
+        return ""
+    elif resp.status_code == 404:
+        raise RuntimeError(f"Gemini model `{validated_model}` not found (HTTP 404): {resp.text}")
+    else:
+        raise RuntimeError(f"Gemini API error (HTTP {resp.status_code}): {resp.text}")
+
+
+def _call_groq_completion(
+    client: Groq,
+    system_content: str,
+    user_content: str,
+    model: str = MODEL_NAME,
+) -> str:
     """Invoke Groq chat completion API with strict timeout."""
     response = client.chat.completions.create(
-        model=MODEL_NAME,
+        model=model,
         messages=[
             {"role": "system", "content": system_content},
             {"role": "user", "content": user_content},
@@ -263,7 +345,7 @@ def analyze_review_with_llm(
     product_title: Optional[str] = None,
     index: Optional[int] = None,
 ) -> LLMReviewAnalysis:
-    """Analyze a single review for authenticity using Groq Llama 3.3 70B.
+    """Analyze a single review for authenticity using Gemini 3.1+ (or Groq fallback).
 
     Args:
         review: ScrapedReview object containing text and metadata.
@@ -274,9 +356,20 @@ def analyze_review_with_llm(
         LLMReviewAnalysis object with structured evaluation.
     """
     settings = get_settings()
-    api_key = (settings.groq_api_key or os.environ.get("GROQ_API_KEY", "")).strip()
+    raw_gemini_key = getattr(settings, "gemini_api_key", "")
+    if not isinstance(raw_gemini_key, str):
+        raw_gemini_key = ""
+    gemini_key = (raw_gemini_key or os.environ.get("GEMINI_API_KEY", "")).strip()
 
-    if not api_key or api_key == "your_groq_api_key_here":
+    raw_groq_key = getattr(settings, "groq_api_key", "")
+    if not isinstance(raw_groq_key, str):
+        raw_groq_key = ""
+    groq_key = (raw_groq_key or os.environ.get("GROQ_API_KEY", "")).strip()
+
+    use_gemini = bool(gemini_key and gemini_key != "your_gemini_api_key_here")
+    use_groq = bool(not use_gemini and groq_key and groq_key != "your_groq_api_key_here")
+
+    if not use_gemini and not use_groq:
         return LLMReviewAnalysis(
             authenticity_score=50,
             classification="uncertain",
@@ -288,27 +381,28 @@ def analyze_review_with_llm(
         )
 
     idx_str = str(index) if index is not None else "0"
-    logger.info("LLM analysis called for review %s", idx_str)
-
-    try:
-        client = Groq(api_key=api_key, timeout=REQUEST_TIMEOUT)
-    except Exception:
-        return LLMReviewAnalysis(
-            authenticity_score=50,
-            classification="uncertain",
-            confidence="low",
-            reasoning="",
-            signals=[],
-            llm_available=False,
-            fallback_reason="api_error",
-        )
+    provider = "gemini" if use_gemini else "groq"
+    logger.info("LLM analysis called for review %s (provider=%s)", idx_str, provider)
 
     user_prompt = _build_user_prompt(review, product_title)
 
+    def _execute_call(prompt: str) -> str:
+        if use_gemini:
+            raw_model = getattr(settings, "gemini_model", DEFAULT_GEMINI_MODEL)
+            if not isinstance(raw_model, str):
+                raw_model = DEFAULT_GEMINI_MODEL
+            model = _validate_gemini_model(raw_model)
+            return _call_gemini_completion(gemini_key, model, SYSTEM_PROMPT, prompt)
+        else:
+            client = Groq(api_key=groq_key, timeout=REQUEST_TIMEOUT)
+            raw_groq_model = getattr(settings, "groq_model", MODEL_NAME)
+            groq_model = raw_groq_model if isinstance(raw_groq_model, str) else MODEL_NAME
+            return _call_groq_completion(client, SYSTEM_PROMPT, prompt, model=groq_model)
+
     # First attempt with full prompt
     try:
-        raw_output = _call_groq_completion(client, SYSTEM_PROMPT, user_prompt)
-    except (groq.APITimeoutError, TimeoutError):
+        raw_output = _execute_call(user_prompt)
+    except (groq.APITimeoutError, TimeoutError, httpx.TimeoutException):
         return LLMReviewAnalysis(
             authenticity_score=50,
             classification="uncertain",
@@ -347,9 +441,9 @@ def analyze_review_with_llm(
     if parsed_data is None:
         fallback_prompt = _build_fallback_prompt(review)
         try:
-            raw_fallback = _call_groq_completion(client, SYSTEM_PROMPT, fallback_prompt)
+            raw_fallback = _execute_call(fallback_prompt)
             parsed_data = _extract_and_parse_json(raw_fallback)
-        except (groq.APITimeoutError, TimeoutError):
+        except (groq.APITimeoutError, TimeoutError, httpx.TimeoutException):
             return LLMReviewAnalysis(
                 authenticity_score=50,
                 classification="uncertain",
@@ -382,16 +476,16 @@ def analyze_review_with_llm(
                 fallback_reason="api_error",
             )
 
-        if parsed_data is None:
-            return LLMReviewAnalysis(
-                authenticity_score=50,
-                classification="uncertain",
-                confidence="low",
-                reasoning="",
-                signals=[],
-                llm_available=False,
-                fallback_reason="parse_error",
-            )
+    if parsed_data is None:
+        return LLMReviewAnalysis(
+            authenticity_score=50,
+            classification="uncertain",
+            confidence="low",
+            reasoning="",
+            signals=[],
+            llm_available=False,
+            fallback_reason="parse_error",
+        )
 
     result = _parse_analysis_dict(parsed_data)
     logger.info("LLM analysis result: %s with %s confidence", result.classification, result.confidence)

@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { RiskReport, MOCK_REPORT } from "../lib/mockData";
+import { RiskReport } from "../lib/mockData";
 import AnalysisProgress from "../components/progress/AnalysisProgress";
 import ReportDashboard from "../components/report/ReportDashboard";
 import AnalysisError from "../components/AnalysisError";
@@ -19,7 +19,6 @@ export default function HomePage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Synchronize theme attribute on mount and toggle
   useEffect(() => {
     const currentTheme = document.documentElement.getAttribute("data-theme") as "dark" | "light" | null;
     if (currentTheme) {
@@ -38,14 +37,13 @@ export default function HomePage() {
   const validateAndProcessFile = (file: File) => {
     setInlineValidationError(null);
 
-    // Client-side validations (Section 10)
     if (!file.name.toLowerCase().endsWith(".pdf") && file.type !== "application/pdf") {
       setInlineValidationError("Please upload a PDF file.");
       return;
     }
 
-    if (file.size > 40 * 1024 * 1024) {
-      setInlineValidationError("This file is too large. VeriScholar accepts PDFs up to 15MB.");
+    if (file.size > 20 * 1024 * 1024) {
+      setInlineValidationError("This file is too large. VeriScholar accepts PDFs up to 20MB.");
       return;
     }
 
@@ -110,10 +108,12 @@ export default function HomePage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-between relative z-10">
-      {/* NAVBAR (Section 5) */}
-      <header className="sticky top-0 z-50 w-full bg-[var(--bg)]/80 backdrop-blur-sm border-b border-[var(--border-soft)]">
-        <div className="container-wide h-[76px] flex items-center justify-between">
+    <div className="min-h-screen flex flex-col justify-between font-sans bg-[var(--bg)] text-[var(--text)] transition-colors relative z-10">
+      {/* ═════════════════════════════════════════════════════════════════════
+          MODERN SAAS NAVBAR (Consistent Across Both Workspaces)
+         ═════════════════════════════════════════════════════════════════════ */}
+      <header className="sticky top-0 z-50 w-full bg-[var(--bg)]/80 backdrop-blur-md border-b border-[var(--border)]">
+        <div className="max-w-7xl mx-auto h-[68px] px-4 sm:px-6 lg:px-8 flex items-center justify-between">
           {/* Wordmark (no icon, no gradient) */}
           <Link href="/" onClick={handleReset} className="flex items-baseline cursor-pointer">
             <span className="font-sans font-semibold text-lg tracking-tight text-[var(--text)]">
@@ -124,70 +124,54 @@ export default function HomePage() {
             </span>
           </Link>
 
-          {/* Navigation Links & Theme Toggle */}
-          <div className="flex items-center gap-8">
-            <nav className="flex items-center gap-6 text-sm font-sans">
-              <Link
-                href="/"
-                onClick={handleReset}
-                className="text-[var(--text)] border-b border-[var(--accent)] pb-0.5 cursor-pointer"
-              >
-                Analyzer
-              </Link>
-              <Link
-                href="/methodology"
-                className="text-[var(--text-muted)] hover:text-[var(--text)] pb-0.5 transition-colors cursor-pointer"
-              >
-                Methodology
-              </Link>
-              <Link
-                href="/reviews"
-                className="text-[var(--text-muted)] hover:text-[var(--text)] pb-0.5 transition-colors cursor-pointer"
-              >
-                Review Checker
-              </Link>
-            </nav>
+          {/* Segmented Workspace Switcher */}
+          <nav className="flex items-center p-1 bg-zinc-900/90 rounded-xl border border-white/[0.08] text-xs font-medium">
+            <Link
+              href="/"
+              onClick={handleReset}
+              className="px-3.5 py-1.5 rounded-lg bg-zinc-100 text-zinc-950 shadow-sm transition-all cursor-pointer font-semibold flex items-center gap-1.5"
+            >
+              <svg className="w-3.5 h-3.5 text-zinc-950" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+              </svg>
+              <span>Manuscript Screener</span>
+            </Link>
 
-            {/* Theme Toggle Button */}
+            <Link
+              href="/reviews"
+              className="px-3.5 py-1.5 rounded-lg text-zinc-400 hover:text-zinc-100 transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              <svg className="w-3.5 h-3.5 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+              </svg>
+              <span>Review Integrity</span>
+            </Link>
+
+            <Link
+              href="/methodology"
+              className="hidden sm:flex px-3.5 py-1.5 rounded-lg text-zinc-400 hover:text-zinc-100 transition-all cursor-pointer"
+            >
+              Methodology
+            </Link>
+          </nav>
+
+          {/* Right Theme Toggle */}
+          <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={toggleTheme}
-              className="text-[var(--text-muted)] hover:text-[var(--text)] transition-colors p-1 cursor-pointer"
+              className="w-8 h-8 rounded-lg bg-zinc-900 border border-white/[0.08] text-zinc-400 hover:text-zinc-100 flex items-center justify-center cursor-pointer transition-colors"
               aria-label="Toggle theme"
             >
               {theme === "dark" ? (
-                // Moon Icon
-                <svg
-                  className="w-[17px] h-[17px]"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
                 </svg>
               ) : (
-                // Sun Icon
-                <svg
-                  className="w-[17px] h-[17px]"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <circle cx="12" cy="12" r="5" />
-                  <line x1="12" y1="1" x2="12" y2="3" />
-                  <line x1="12" y1="21" x2="12" y2="23" />
-                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                  <line x1="1" y1="12" x2="3" y2="12" />
-                  <line x1="21" y1="12" x2="23" y2="12" />
-                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="4" />
+                  <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
                 </svg>
               )}
             </button>
@@ -195,98 +179,128 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* MAIN VIEWPORT */}
-      <main className="flex-1">
+      {/* ═════════════════════════════════════════════════════════════════════
+          MAIN VIEWPORT
+         ═════════════════════════════════════════════════════════════════════ */}
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         {/* LANDING VIEW */}
         {viewState === "landing" && (
-          <div className="container-text py-16 sm:py-24 space-y-20">
+          <div className="space-y-16 animate-tab-panel">
             {/* HERO SECTION */}
-            <section className="space-y-6">
-              <h1 className="font-serif font-medium text-[clamp(34px,5vw,52px)] text-[var(--text)] max-w-[16ch] leading-[1.16] tracking-tight">
-                A quiet second reader for every paper you submit
+            <div className="text-center space-y-4 max-w-3xl mx-auto pt-4">
+              <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold text-[var(--text)] tracking-tight leading-[1.12]">
+                Screen scientific manuscripts with{" "}
+                <span className="bg-gradient-to-r from-zinc-100 via-zinc-300 to-zinc-400 bg-clip-text text-transparent">
+                  forensic precision
+                </span>
               </h1>
 
-              <p className="font-sans text-[17px] text-[var(--text-muted)] max-w-[54ch] leading-relaxed">
-                VeriScholar checks a paper&apos;s metadata, citations, and internal consistency against the public record, then tells you plainly what it found — and what it didn&apos;t.
+              <p className="text-sm sm:text-base text-[var(--text-muted)] max-w-xl mx-auto leading-relaxed">
+                VeriScholar audits citations against OpenAlex &amp; Crossref graphs, detects phantom references, and scans internal document consistency before peer review.
               </p>
+            </div>
 
-              {/* Upload Action Row */}
-              <div className="pt-2 space-y-2">
-                <div className="flex items-center gap-4">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".pdf,application/pdf"
-                    className="hidden"
-                    onChange={handleFileInputChange}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="btn cursor-pointer"
-                  >
-                    Upload a paper
-                  </button>
-                  <span className="font-sans text-xs text-[var(--text-muted)]">
-                    PDF, up to 15MB
-                  </span>
-                </div>
+            {/* MODERN DRAG & DROP UPLOAD ZONE */}
+            <div className="max-w-2xl mx-auto">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,application/pdf"
+                className="hidden"
+                onChange={handleFileInputChange}
+              />
 
-                {/* Inline Validation Error */}
-                {inlineValidationError && (
-                  <div className="text-xs text-[var(--danger)] font-sans pt-1">
-                    {inlineValidationError}
-                  </div>
-                )}
-              </div>
-
-              {/* Drop Strip (NOT a dashed box) */}
               <div
                 onDragEnter={handleDragOver}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
-                className={`w-full py-6 border-t border-[var(--border-soft)] text-xs text-[var(--text-muted)] font-sans cursor-pointer transition-colors ${isDragOver ? "bg-[var(--bg-raise)] text-[var(--text)]" : ""
-                  }`}
+                className={`saas-card p-8 sm:p-12 text-center cursor-pointer transition-all border-dashed relative overflow-hidden group ${
+                  isDragOver
+                    ? "border-zinc-400 bg-zinc-900/90 shadow-2xl scale-[1.01]"
+                    : "border-white/[0.12] hover:border-zinc-500 hover:bg-zinc-900/50"
+                }`}
               >
-                Or drop a PDF anywhere on this page.
-              </div>
-            </section>
+                {/* Subtle Ambient Glow */}
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-24 bg-white/[0.03] blur-3xl pointer-events-none group-hover:bg-white/[0.06] transition-all" />
 
-            {/* RECENTLY REVIEWED SECTION */}
-            <section className="space-y-6">
-              <div>
-                <h2 className="font-serif text-2xl font-medium text-[var(--text)]">
-                  Recently reviewed
-                </h2>
-                <p className="font-sans text-sm text-[var(--text-muted)] mt-1">
-                  Sample reports — select one to view the full screening report.
-                </p>
+                <div className="space-y-4 relative z-10">
+                  <div className="w-16 h-16 mx-auto rounded-2xl bg-zinc-800/90 border border-white/[0.1] flex items-center justify-center text-zinc-200 group-hover:scale-105 group-hover:border-zinc-500 transition-all shadow-lg">
+                    <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                      <line x1="12" y1="18" x2="12" y2="12" />
+                      <line x1="9" y1="15" x2="12" y2="12" />
+                      <line x1="15" y1="15" x2="12" y2="12" />
+                    </svg>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="text-base sm:text-lg font-semibold text-[var(--text)]">
+                      Drop your research paper PDF here, or <span className="text-zinc-200 underline underline-offset-4 font-medium">browse files</span>
+                    </div>
+                    <div className="text-xs text-[var(--text-faint)] font-mono">
+                      Accepts scientific PDF manuscripts up to 20MB
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        fileInputRef.current?.click();
+                      }}
+                      className="btn-primary py-2 px-6 text-xs sm:text-sm font-semibold rounded-lg"
+                    >
+                      Select PDF File
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              <div className="divide-y divide-[var(--border-soft)] border-t border-b border-[var(--border-soft)]">
+              {inlineValidationError && (
+                <div className="text-xs text-rose-400 font-medium text-center pt-2">
+                  {inlineValidationError}
+                </div>
+              )}
+            </div>
+
+            {/* SAMPLE DEMO PAPERS (Interactive Cards) */}
+            <div className="max-w-4xl mx-auto space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-[var(--border)]">
+                <div>
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-[var(--text-muted)] font-mono">
+                    Sample Pre-Screened Manuscripts
+                  </h3>
+                  <p className="text-xs text-[var(--text-faint)]">
+                    Explore calibrated screening reports on pre-configured test cases.
+                  </p>
+                </div>
+                <span className="text-xs font-mono text-zinc-400">1-Click Demos</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Sample 1 */}
                 <button
                   type="button"
                   onClick={() => handleSampleClick(0)}
-                  className="w-full text-left py-4 flex justify-between items-center group relative hover:pl-3 transition-all cursor-pointer"
+                  className="saas-card p-5 text-left space-y-3 cursor-pointer group hover:border-amber-500/40 transition-all flex flex-col justify-between"
                 >
-                  <div className="space-y-1">
-                    <div className="font-serif text-[19px] font-medium text-[var(--text)] group-hover:text-[var(--accent)] transition-colors">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-semibold">
+                        MODERATE SCRUTINY
+                      </span>
+                      <span className="text-[10px] font-mono text-[var(--text-faint)]">EMNLP 2025</span>
+                    </div>
+                    <h4 className="text-sm font-semibold text-[var(--text)] group-hover:text-zinc-100 transition-colors line-clamp-2 leading-snug">
                       Latent Drift: Measuring Representation Instability in Fine-Tuned Language Models
-                    </div>
-                    <div className="font-sans text-sm text-[var(--text-muted)]">
-                      EMNLP 2025 — Kowalski, Menon, Subramaniam, Álvarez
-                    </div>
+                    </h4>
                   </div>
-                  <div className="text-right shrink-0 ml-4">
-                    <div className="font-serif italic text-sm text-[var(--warn)]">
-                      Moderate
-                    </div>
-                    <div className="font-sans text-xs text-[var(--text-faint)] mt-0.5">
-                      2 minutes ago
-                    </div>
+                  <div className="text-xs text-[var(--text-faint)] font-mono">
+                    Kowalski, Menon, Subramaniam
                   </div>
                 </button>
 
@@ -294,23 +308,21 @@ export default function HomePage() {
                 <button
                   type="button"
                   onClick={() => handleSampleClick(1)}
-                  className="w-full text-left py-4 flex justify-between items-center group relative hover:pl-3 transition-all cursor-pointer"
+                  className="saas-card p-5 text-left space-y-3 cursor-pointer group hover:border-emerald-500/40 transition-all flex flex-col justify-between"
                 >
-                  <div className="space-y-1">
-                    <div className="font-serif text-[19px] font-medium text-[var(--text)] group-hover:text-[var(--accent)] transition-colors">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">
+                        CLEAN VALIDATION
+                      </span>
+                      <span className="text-[10px] font-mono text-[var(--text-faint)]">J. Mat. Chem</span>
+                    </div>
+                    <h4 className="text-sm font-semibold text-[var(--text)] group-hover:text-zinc-100 transition-colors line-clamp-2 leading-snug">
                       Photocatalytic Efficiency of Doped TiO₂ Nanostructures Under Visible Light
-                    </div>
-                    <div className="font-sans text-sm text-[var(--text-muted)]">
-                      Journal of Materials Chemistry — 3 authors
-                    </div>
+                    </h4>
                   </div>
-                  <div className="text-right shrink-0 ml-4">
-                    <div className="font-serif italic text-sm text-[var(--good)]">
-                      Low
-                    </div>
-                    <div className="font-sans text-xs text-[var(--text-faint)] mt-0.5">
-                      1 hour ago
-                    </div>
+                  <div className="text-xs text-[var(--text-faint)] font-mono">
+                    Journal of Materials &bull; 3 authors
                   </div>
                 </button>
 
@@ -318,55 +330,71 @@ export default function HomePage() {
                 <button
                   type="button"
                   onClick={() => handleSampleClick(2)}
-                  className="w-full text-left py-4 flex justify-between items-center group relative hover:pl-3 transition-all cursor-pointer"
+                  className="saas-card p-5 text-left space-y-3 cursor-pointer group hover:border-rose-500/40 transition-all flex flex-col justify-between"
                 >
-                  <div className="space-y-1">
-                    <div className="font-serif text-[19px] font-medium text-[var(--text)] group-hover:text-[var(--accent)] transition-colors">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 font-semibold">
+                        HIGH ATTENTION
+                      </span>
+                      <span className="text-[10px] font-mono text-[var(--text-faint)]">Preprint 2025</span>
+                    </div>
+                    <h4 className="text-sm font-semibold text-[var(--text)] group-hover:text-zinc-100 transition-colors line-clamp-2 leading-snug">
                       Early Markers of Cognitive Decline in Longitudinal Cohort Studies
-                    </div>
-                    <div className="font-sans text-sm text-[var(--text-muted)]">
-                      Preprint — 6 authors
-                    </div>
+                    </h4>
                   </div>
-                  <div className="text-right shrink-0 ml-4">
-                    <div className="font-serif italic text-sm text-[var(--danger)]">
-                      Needs review
-                    </div>
-                    <div className="font-sans text-xs text-[var(--text-faint)] mt-0.5">
-                      Yesterday
-                    </div>
+                  <div className="text-xs text-[var(--text-faint)] font-mono">
+                    Preprint Server &bull; 6 authors
                   </div>
                 </button>
               </div>
-            </section>
+            </div>
 
-            {/* HOW A REPORT GETS MADE */}
-            <section className="space-y-6">
-              <h2 className="font-serif text-2xl font-medium text-[var(--text)]">
-                How a report gets made
-              </h2>
-
-              <div className="space-y-4 max-w-[60ch] font-sans text-[15.5px] leading-relaxed text-[var(--text-muted)]">
-                <p>
-                  <span className="font-serif italic text-[var(--text)] mr-1">First,</span>
-                  the PDF is parsed for text, structure, and layout, and its metadata is checked against Crossref and OpenAlex for a matching record.
-                </p>
-                <p>
-                  <span className="font-serif italic text-[var(--text)] mr-1">Then,</span>
-                  each reference is resolved against public indexes, and the abstract, body, and figures are compared for internal consistency.
-                </p>
-                <p>
-                  <span className="font-serif italic text-[var(--text)] mr-1">Finally,</span>
-                  everything is compiled into one report — with risk, confidence, and modules shown as separate, distinct measures.
-                </p>
+            {/* THREE CORE FORENSIC PILLARS */}
+            <div className="max-w-5xl mx-auto pt-8">
+              <div className="text-center space-y-1 pb-6">
+                <div className="text-xs font-mono uppercase tracking-wider text-zinc-400">Multi-Vector Architecture</div>
+                <h3 className="text-xl font-bold text-[var(--text)]">Three Pillars of Manuscript Screening</h3>
               </div>
-            </section>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="saas-card p-6 space-y-3">
+                  <div className="w-10 h-10 rounded-xl bg-zinc-800 border border-zinc-700/80 flex items-center justify-center text-zinc-200 font-mono font-bold">
+                    01
+                  </div>
+                  <h4 className="text-base font-semibold text-[var(--text)]">Citation Graph Integrity</h4>
+                  <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+                    Live verification against OpenAlex and Crossref bibliographies. Identifies phantom citations, fabricated DOIs, and distorted publication dates.
+                  </p>
+                </div>
+
+                <div className="saas-card p-6 space-y-3">
+                  <div className="w-10 h-10 rounded-xl bg-zinc-800 border border-zinc-700/80 flex items-center justify-center text-zinc-200 font-mono font-bold">
+                    02
+                  </div>
+                  <h4 className="text-base font-semibold text-[var(--text)]">Structural Consistency</h4>
+                  <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+                    Audits cross-references to figures, tables, and equations. Verifies that claimed experimental assets actually exist within the manuscript text.
+                  </p>
+                </div>
+
+                <div className="saas-card p-6 space-y-3">
+                  <div className="w-10 h-10 rounded-xl bg-zinc-800 border border-zinc-700/80 flex items-center justify-center text-zinc-200 font-mono font-bold">
+                    03
+                  </div>
+                  <h4 className="text-base font-semibold text-[var(--text)]">Stylometric NLP Telemetry</h4>
+                  <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+                    Scans passive voice hedging, vocabulary richness, and section-by-section stylistic drift to detect anomalous synthetic composition patterns.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
         {/* PROGRESS VIEW */}
         {viewState === "progress" && (
-          <div className="container-text py-16">
+          <div className="max-w-2xl mx-auto py-12">
             <AnalysisProgress
               file={selectedFile}
               isMock={isMockMode}
@@ -378,30 +406,31 @@ export default function HomePage() {
 
         {/* REPORT VIEW */}
         {viewState === "report" && reportData && (
-          <div className="container-wide py-8">
-            <ReportDashboard
-              data={reportData}
-              isMock={isMockMode}
-              onBack={handleReset}
-              onReset={handleReset}
-            />
-          </div>
+          <ReportDashboard
+            data={reportData}
+            isMock={isMockMode}
+            onBack={handleReset}
+            onReset={handleReset}
+          />
         )}
 
         {/* ERROR VIEW */}
         {viewState === "error" && (
-          <div className="container-text py-16">
+          <div className="max-w-xl mx-auto py-12">
             <AnalysisError message={errorMessage} onRetry={handleReset} />
           </div>
         )}
       </main>
 
       {/* FOOTER */}
-      <footer className="w-full border-t border-[var(--border)] py-6 mt-16">
-        <div className="container-wide flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 text-xs text-[var(--text-muted)] font-sans">
-          <div>© 2026 VeriScholar. A design prototype.</div>
-          <div className="max-w-[38ch] sm:text-right leading-relaxed">
-            VeriScholar surfaces screening signals — it does not determine or prove research misconduct.
+      <footer className="w-full border-t border-[var(--border)] py-6 bg-[var(--bg)] text-xs text-[var(--text-faint)]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-[var(--text)]">VeriScholar</span>
+            <span>&bull; Academic Integrity &amp; Consumer Trust Analytics</span>
+          </div>
+          <div className="font-mono text-[11px]">
+            Screening Instrument &bull; Not a Determination of Misconduct
           </div>
         </div>
       </footer>

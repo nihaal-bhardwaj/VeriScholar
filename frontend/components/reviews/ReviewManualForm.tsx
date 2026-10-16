@@ -55,7 +55,6 @@ export default function ReviewManualForm({ onSubmit, disabled }: ReviewManualFor
     });
   };
 
-  // Check whether at least 1 block has non-empty review_text
   const hasAtLeastOneReview = blocks.some((b) => b.review_text.trim().length > 0);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -64,7 +63,6 @@ export default function ReviewManualForm({ onSubmit, disabled }: ReviewManualFor
 
     if (!hasAtLeastOneReview) return;
 
-    // Filter down to non-empty reviews or send all valid reviews
     const validReviews: ManualReview[] = blocks
       .filter((b) => b.review_text.trim().length > 0)
       .map((b) => ({
@@ -78,14 +76,18 @@ export default function ReviewManualForm({ onSubmit, disabled }: ReviewManualFor
 
   return (
     <form onSubmit={handleSubmit} className="w-full space-y-5 font-sans" noValidate>
+      <div className="text-xs text-[var(--text-faint)]">
+        <span>Enter custom review texts below</span>
+      </div>
+
       <div className="space-y-4">
         {blocks.map((block, index) => (
           <div
             key={block.id}
-            className="p-4 sm:p-5 bg-[var(--rc-card)] border border-[var(--rc-border)] rounded-xl shadow-xs space-y-4 transition-all"
+            className="p-4 sm:p-5 bg-zinc-900/80 border border-white/[0.08] rounded-xl shadow-md space-y-4 transition-all"
           >
-            <div className="flex items-center justify-between gap-2 border-b border-[var(--rc-border)] pb-3">
-              <span className="text-xs font-semibold uppercase tracking-wider text-[var(--rc-text-muted)]">
+            <div className="flex items-center justify-between gap-2 border-b border-white/[0.06] pb-3">
+              <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)] font-mono">
                 Review #{index + 1}
               </span>
               {blocks.length > 1 && (
@@ -93,7 +95,7 @@ export default function ReviewManualForm({ onSubmit, disabled }: ReviewManualFor
                   type="button"
                   onClick={() => removeBlock(index)}
                   disabled={disabled}
-                  className="text-[var(--rc-text-muted)] hover:text-[var(--rc-danger)] p-1 rounded-md transition-colors cursor-pointer disabled:opacity-50"
+                  className="text-[var(--text-faint)] hover:text-rose-400 p-1 rounded-md transition-colors cursor-pointer disabled:opacity-50"
                   aria-label={`Remove review #${index + 1}`}
                   title="Remove review"
                 >
@@ -117,18 +119,18 @@ export default function ReviewManualForm({ onSubmit, disabled }: ReviewManualFor
             <div>
               <label
                 htmlFor={`review-text-${block.id}`}
-                className="block text-xs sm:text-sm font-medium text-[var(--rc-text)] mb-1.5"
+                className="block text-xs sm:text-sm font-medium text-[var(--text)] mb-1.5"
               >
-                Review Text <span className="text-[var(--rc-danger)]">*</span>
+                Review Text <span className="text-rose-400">*</span>
               </label>
               <textarea
                 id={`review-text-${block.id}`}
                 rows={3}
                 value={block.review_text}
                 onChange={(e) => updateField(index, "review_text", e.target.value)}
-                placeholder="Paste the full review comment here..."
+                placeholder="Paste review comment text here..."
                 disabled={disabled}
-                className="w-full px-3.5 py-2.5 bg-white text-[var(--rc-text)] placeholder-[var(--rc-text-muted)] border border-[var(--rc-border)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--rc-primary)] focus:border-[var(--rc-primary)] transition-all resize-y disabled:opacity-60"
+                className="w-full px-3.5 py-2.5 bg-zinc-950/80 text-[var(--text)] placeholder-[var(--text-faint)] border border-white/[0.08] rounded-lg text-sm focus:outline-none focus:border-zinc-400 transition-all resize-y disabled:opacity-60"
               />
             </div>
 
@@ -138,7 +140,7 @@ export default function ReviewManualForm({ onSubmit, disabled }: ReviewManualFor
               <div>
                 <label
                   id={`rating-label-${block.id}`}
-                  className="block text-xs font-medium text-[var(--rc-text-muted)] mb-1"
+                  className="block text-xs font-medium text-[var(--text-muted)] mb-1"
                 >
                   Star Rating (optional)
                 </label>
@@ -158,23 +160,9 @@ export default function ReviewManualForm({ onSubmit, disabled }: ReviewManualFor
                         aria-label={`${star} star${star > 1 ? "s" : ""}`}
                         disabled={disabled}
                         onClick={() => {
-                          // Clicking the same star toggles to null if desired, or sets to star
-                          updateField(
-                            index,
-                            "rating",
-                            block.rating === star ? null : star
-                          );
+                          updateField(index, "rating", block.rating === star ? null : star);
                         }}
-                        onKeyDown={(e) => {
-                          if (e.key === "ArrowRight" || e.key === "ArrowUp") {
-                            e.preventDefault();
-                            updateField(index, "rating", Math.min(5, (block.rating ?? 0) + 1));
-                          } else if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
-                            e.preventDefault();
-                            updateField(index, "rating", Math.max(1, (block.rating ?? 1) - 1));
-                          }
-                        }}
-                        className="p-1 rounded text-amber-400 hover:text-amber-500 focus-visible:ring-2 focus-visible:ring-[var(--rc-primary)] transition-colors cursor-pointer disabled:opacity-60"
+                        className="p-1 rounded text-amber-400 hover:text-amber-300 transition-colors cursor-pointer disabled:opacity-60"
                       >
                         <svg
                           className="w-5 h-5"
@@ -191,7 +179,7 @@ export default function ReviewManualForm({ onSubmit, disabled }: ReviewManualFor
                     );
                   })}
                   {block.rating !== null && (
-                    <span className="text-xs text-[var(--rc-text-muted)] ml-1.5 font-medium">
+                    <span className="text-xs text-[var(--text-muted)] ml-1.5 font-mono font-medium">
                       {block.rating}/5
                     </span>
                   )}
@@ -206,11 +194,11 @@ export default function ReviewManualForm({ onSubmit, disabled }: ReviewManualFor
                   checked={block.verified_purchase}
                   onChange={(e) => updateField(index, "verified_purchase", e.target.checked)}
                   disabled={disabled}
-                  className="w-4 h-4 text-[var(--rc-primary)] border-[var(--rc-border)] rounded focus:ring-[var(--rc-primary)] cursor-pointer disabled:opacity-60"
+                  className="w-4 h-4 text-zinc-100 border-zinc-700 bg-zinc-900 rounded focus:ring-zinc-400 cursor-pointer disabled:opacity-60"
                 />
                 <label
                   htmlFor={`verified-${block.id}`}
-                  className="text-xs sm:text-sm text-[var(--rc-text)] font-medium cursor-pointer select-none"
+                  className="text-xs sm:text-sm text-[var(--text-muted)] font-medium cursor-pointer select-none"
                 >
                   Verified purchase
                 </label>
@@ -221,7 +209,7 @@ export default function ReviewManualForm({ onSubmit, disabled }: ReviewManualFor
       </div>
 
       {submittedAttempt && !hasAtLeastOneReview && (
-        <p role="alert" className="text-sm font-medium text-[var(--rc-danger)] flex items-center gap-1.5">
+        <p role="alert" className="text-xs font-medium text-rose-400 flex items-center gap-1.5">
           <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="8" x2="12" y2="12" />
@@ -237,10 +225,10 @@ export default function ReviewManualForm({ onSubmit, disabled }: ReviewManualFor
           type="button"
           onClick={addBlock}
           disabled={disabled}
-          className="px-4 py-2.5 bg-white hover:bg-gray-50 text-[var(--rc-text)] border border-[var(--rc-border)] rounded-xl text-sm font-medium shadow-2xs hover:shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+          className="btn-secondary text-xs sm:text-sm py-2 px-4 cursor-pointer"
         >
           <svg
-            className="w-4 h-4 text-[var(--rc-primary)]"
+            className="w-4 h-4 text-zinc-300"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -256,7 +244,7 @@ export default function ReviewManualForm({ onSubmit, disabled }: ReviewManualFor
         <button
           type="submit"
           disabled={disabled || !hasAtLeastOneReview}
-          className="px-6 py-3 bg-[var(--rc-primary)] hover:bg-[var(--rc-primary-dark)] text-white font-medium rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 text-sm sm:text-base cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus-visible:ring-2 focus-visible:ring-[var(--rc-primary)] focus-visible:ring-offset-2"
+          className="btn-primary py-2.5 px-6 text-xs sm:text-sm cursor-pointer disabled:opacity-50"
         >
           <span>Analyze Reviews</span>
           <svg

@@ -75,7 +75,7 @@ export default function PDFUploader({ onUpload, isUploading }: PDFUploaderProps)
       <div
         className={`relative flex flex-col items-center justify-center w-full h-64 p-6 border-2 border-dashed rounded-3xl transition-all duration-300 ease-in-out cursor-pointer group shadow-sm overflow-hidden ${
           isDragActive
-            ? "border-blue-500 bg-blue-50/50 dark:bg-blue-900/20"
+            ? "border-zinc-400 bg-zinc-100/50 dark:bg-zinc-800/40"
             : "border-zinc-300 bg-white dark:border-zinc-700 dark:bg-zinc-900/50 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
         } ${isUploading ? "opacity-50 pointer-events-none" : ""}`}
         onDragEnter={handleDragEnter}
@@ -92,7 +92,7 @@ export default function PDFUploader({ onUpload, isUploading }: PDFUploaderProps)
         }}
         aria-label="Upload PDF file"
       >
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/50 to-purple-50/50 dark:from-indigo-900/10 dark:to-purple-900/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+        <div className="absolute inset-0 bg-white/[0.03] opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
         
         <input
           type="file"
@@ -106,7 +106,7 @@ export default function PDFUploader({ onUpload, isUploading }: PDFUploaderProps)
           <div className="p-4 bg-zinc-100 dark:bg-zinc-800 rounded-full group-hover:scale-110 group-hover:shadow-md transition-all duration-300">
             <svg
               className={`w-10 h-10 ${
-                isDragActive ? "text-blue-500" : "text-zinc-500 dark:text-zinc-400"
+                isDragActive ? "text-zinc-200" : "text-zinc-500 dark:text-zinc-400"
               }`}
               fill="none"
               stroke="currentColor"
@@ -123,10 +123,10 @@ export default function PDFUploader({ onUpload, isUploading }: PDFUploaderProps)
           </div>
           <div className="space-y-1">
             <p className="text-lg font-medium text-zinc-900 dark:text-zinc-100">
-              <span className="text-blue-600 dark:text-blue-400 font-semibold group-hover:underline">Click to upload</span> or drag and drop
+              <span className="text-zinc-100 font-semibold group-hover:underline">Click to upload</span> or drag and drop
             </p>
             <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              PDF only (max. 10MB)
+              PDF only (max. 20MB)
             </p>
           </div>
         </div>
